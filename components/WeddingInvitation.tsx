@@ -7,14 +7,14 @@ interface GuestData {
   acompañantes: number
 }
 
-type Phase = 'validating' | 'envelope' | 'invitation'
+type Phase = 'validating' | 'envelope' | 'video' | 'invitation'
 
 export default function WeddingInvitation() {
   const [phase, setPhase] = useState<Phase>('validating')
   const [guestData, setGuestData] = useState<GuestData | null>(null)
   const [validationError, setValidationError] = useState(false)
-  const [isVideoPlaying, setIsVideoPlaying] = useState(false)
   const videoRef = useRef<HTMLVideoElement>(null)
+  const invitationRef = useRef<HTMLDivElement>(null)
 
   // Mock Supabase validation
   const validateGuest = async () => {
@@ -45,14 +45,15 @@ export default function WeddingInvitation() {
   }, [])
 
   const handleEnvelopeClick = () => {
-    setIsVideoPlaying(true)
-    if (videoRef.current) {
-      videoRef.current.play()
-    }
+    setPhase('video')
+    setTimeout(() => {
+      if (videoRef.current) {
+        videoRef.current.play()
+      }
+    }, 100)
   }
 
   const handleVideoEnded = () => {
-    setIsVideoPlaying(false)
     setPhase('invitation')
   }
 
@@ -103,49 +104,60 @@ export default function WeddingInvitation() {
     return (
       <div className="min-h-screen flex items-center justify-center bg-black p-4 overflow-hidden">
         <div className="w-full max-w-2xl relative aspect-square cursor-pointer" onClick={handleEnvelopeClick}>
-          {/* Video Overlay Container */}
           <div className="absolute inset-0 rounded-2xl overflow-hidden" style={{ backgroundColor: 'rgb(26, 16, 8)' }}>
             <video
-              ref={videoRef}
-              onEnded={handleVideoEnded}
+              preload="auto"
               playsInline
               muted
-              preload="auto"
               className="w-full h-full object-cover"
             >
               <source src="/letter.mp4" type="video/mp4" />
             </video>
 
-            {/* Overlay Gradient */}
             <div className="absolute inset-0 bg-gradient-radial from-transparent via-transparent to-black opacity-30"></div>
 
-            {/* Tap to Open Prompt */}
-            {!isVideoPlaying && (
-              <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 pointer-events-none" style={{
-                background: 'radial-gradient(rgba(0, 0, 0, 0.35) 0%, transparent 70%)',
+            <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 pointer-events-none" style={{
+              background: 'radial-gradient(rgba(0, 0, 0, 0.35) 0%, transparent 70%)',
+            }}>
+              <p style={{
+                fontFamily: "'Cormorant Garamond', Georgia, serif",
+                fontSize: '0.85rem',
+                letterSpacing: '0.25em',
+                textTransform: 'uppercase',
+                color: '#ffffff',
+                textShadow: '0 1px 10px rgba(0,0,0,0.6), 0 0 3px rgba(0,0,0,0.4)',
+                userSelect: 'none',
+                margin: 0,
+                paddingBottom: '20%',
               }}>
-                <p style={{
-                  fontFamily: "'Cormorant Garamond', Georgia, serif",
-                  fontSize: '0.85rem',
-                  letterSpacing: '0.25em',
-                  textTransform: 'uppercase',
-                  color: '#ffffff',
-                  textShadow: '0 1px 10px rgba(0,0,0,0.6), 0 0 3px rgba(0,0,0,0.4)',
-                  userSelect: 'none',
-                  margin: 0,
-                  paddingBottom: '20%',
-                }}>
-                  Tap to open
-                </p>
-                <div style={{
-                  width: '28px',
-                  height: '1px',
-                  background: 'linear-gradient(to right, transparent, rgba(255,255,255,0.5), transparent)',
-                }}></div>
-              </div>
-            )}
+                Tap to open
+              </p>
+              <div style={{
+                width: '28px',
+                height: '1px',
+                background: 'linear-gradient(to right, transparent, rgba(255,255,255,0.5), transparent)',
+              }}></div>
+            </div>
           </div>
         </div>
+      </div>
+    )
+  }
+
+  // Video Phase - Fullscreen
+  if (phase === 'video' && guestData) {
+    return (
+      <div className="fixed inset-0 w-full h-full bg-black z-50 flex items-center justify-center animate-in fade-in duration-300">
+        <video
+          ref={videoRef}
+          onEnded={handleVideoEnded}
+          autoPlay
+          playsInline
+          muted
+          className="w-full h-full object-cover"
+        >
+          <source src="/letter.mp4" type="video/mp4" />
+        </video>
       </div>
     )
   }
@@ -155,7 +167,7 @@ export default function WeddingInvitation() {
   // Invitation Phase
   if (phase === 'invitation' && guestData) {
     return (
-      <div className="min-h-screen bg-white text-gray-900 overflow-x-hidden">
+      <div ref={invitationRef} className="min-h-screen bg-white text-gray-900 overflow-x-hidden animate-in fade-in duration-700">
         {/* Main Content */}
         <div className="max-w-3xl mx-auto px-6 py-16 md:py-24">
           
@@ -226,18 +238,47 @@ export default function WeddingInvitation() {
           {/* Divider */}
           <div className="w-px h-12 bg-gray-300 mx-auto mb-12"></div>
 
+          {/* Wedding Program */}
+          <div className="mb-20">
+            <p className="text-sm tracking-widest text-gray-500 uppercase mb-12">The Day</p>
+            <div className="space-y-6">
+              {[
+                { time: '16:30', label: 'Arrival' },
+                { time: '17:00', label: 'Ceremony' },
+                { time: '18:30', label: 'Cocktail & Reception' },
+                { time: '20:00', label: 'Dinner' },
+              ].map((item, idx) => (
+                <div key={idx} className="flex justify-between items-center border-b border-gray-100 pb-6">
+                  <p className="text-sm font-serif font-light">{item.label}</p>
+                  <p className="text-gray-600 text-sm">{item.time}</p>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* Divider */}
+          <div className="w-px h-12 bg-gray-300 mx-auto mb-12"></div>
+
           {/* Dress Code */}
           <div className="mb-20">
             <p className="text-sm tracking-widest text-gray-500 uppercase mb-12">Dress Code</p>
-            <div className="space-y-6 text-center">
-              <div>
-                <p className="text-sm text-gray-600 mb-2">Formal Elegance</p>
-                <p className="text-gray-800 font-serif text-lg">Classical Elegance</p>
-              </div>
-              <div className="pt-6 border-t border-gray-200">
-                <p className="text-xs text-gray-500 italic">
-                  Black tie and formal attire respectfully requested
-                </p>
+            <div className="space-y-8">
+              <p className="text-center text-sm text-gray-700 italic">
+                Formal attire respectfully requested. Let elegance guide your choice.
+              </p>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                <div className="text-center">
+                  <p className="text-xs tracking-widest text-gray-500 uppercase mb-3">For Her</p>
+                  <p className="text-sm font-serif font-light text-gray-800">
+                    Floor-length gown or elegant formal dress
+                  </p>
+                </div>
+                <div className="text-center">
+                  <p className="text-xs tracking-widest text-gray-500 uppercase mb-3">For Him</p>
+                  <p className="text-sm font-serif font-light text-gray-800">
+                    Black tie & dinner jacket
+                  </p>
+                </div>
               </div>
             </div>
           </div>
@@ -245,11 +286,25 @@ export default function WeddingInvitation() {
           {/* Divider */}
           <div className="w-px h-12 bg-gray-300 mx-auto mb-12"></div>
 
+          {/* Divider */}
+          <div className="w-px h-12 bg-gray-300 mx-auto mb-12"></div>
+
+          {/* About the Celebration */}
+          <div className="mb-20">
+            <p className="text-sm tracking-widest text-gray-500 uppercase mb-8">The Celebration</p>
+            <p className="text-center text-gray-700 leading-relaxed font-serif text-lg mb-6">
+              &quot;In a moment of pure joy, we gather to celebrate love&apos;s greatest promise. Join us for an evening of elegance, warmth, and unforgettable moments.&quot;
+            </p>
+          </div>
+
+          {/* Divider */}
+          <div className="w-px h-12 bg-gray-300 mx-auto mb-12"></div>
+
           {/* Guest Count */}
           <div className="mb-20 text-center">
-            <p className="text-sm tracking-widest text-gray-500 uppercase mb-4">Guest Count</p>
+            <p className="text-sm tracking-widest text-gray-500 uppercase mb-4">Party Size</p>
             <p className="text-4xl font-serif font-light">{guestData.acompañantes}</p>
-            <p className="text-xs text-gray-600 mt-4">Plus ones included</p>
+            <p className="text-xs text-gray-600 mt-4">guests</p>
           </div>
 
           {/* Divider */}
@@ -258,15 +313,20 @@ export default function WeddingInvitation() {
           {/* RSVP Section */}
           <div className="text-center mb-20">
             <p className="text-sm tracking-widest text-gray-500 uppercase mb-8">RSVP</p>
-            <p className="text-gray-700 mb-6">
-              Please respond by November 1, 2025
+            <p className="text-gray-700 mb-2 text-sm">
+              Are you attending?
             </p>
-            <a
-              href="mailto:invitaciones@bodajavier-maria.com?subject=Confirmación%20de%20Asistencia"
-              className="inline-block px-8 py-3 border border-gray-900 text-gray-900 font-serif hover:bg-gray-900 hover:text-white transition-all duration-300"
-            >
-              Confirm Attendance
-            </a>
+            <p className="text-gray-600 mb-8 text-xs">
+              Please respond by October 15, 2025
+            </p>
+            <div className="flex flex-col sm:flex-row gap-4 justify-center">
+              <button className="px-8 py-3 border border-gray-900 text-gray-900 font-serif hover:bg-gray-900 hover:text-white transition-all duration-300">
+                I will attend
+              </button>
+              <button className="px-8 py-3 border border-gray-300 text-gray-600 font-serif hover:bg-gray-100 transition-all duration-300">
+                Unable to attend
+              </button>
+            </div>
           </div>
 
           {/* Divider */}
