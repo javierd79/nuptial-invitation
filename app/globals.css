@@ -15,6 +15,10 @@
   .animate-fade-in {
     animation: fadeIn 0.8s ease-in-out forwards;
   }
+  
+  .bg-gradient-radial {
+    background-image: radial-gradient(var(--tw-gradient-stops));
+  }
 }
 
 @custom-variant dark (&:is(.dark *));

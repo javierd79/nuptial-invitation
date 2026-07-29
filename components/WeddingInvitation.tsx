@@ -1,28 +1,25 @@
 'use client'
 
 import { useState, useEffect, useRef } from 'react'
-import { Volume2, VolumeX } from 'lucide-react'
 
 interface GuestData {
   nombre: string
   acompañantes: number
 }
 
-type Phase = 'validating' | 'envelope' | 'video' | 'invitation'
+type Phase = 'validating' | 'envelope' | 'invitation'
 
 export default function WeddingInvitation() {
   const [phase, setPhase] = useState<Phase>('validating')
   const [guestData, setGuestData] = useState<GuestData | null>(null)
   const [validationError, setValidationError] = useState(false)
-  const [isMusicPlaying, setIsMusicPlaying] = useState(false)
-  const audioRef = useRef<HTMLAudioElement>(null)
+  const [isVideoPlaying, setIsVideoPlaying] = useState(false)
   const videoRef = useRef<HTMLVideoElement>(null)
 
   // Mock Supabase validation
   const validateGuest = async () => {
     const params = new URLSearchParams(window.location.search)
     const key = params.get('key')
-    const skipTo = params.get('skip')
 
     // Simulate API delay
     await new Promise((resolve) => setTimeout(resolve, 1500))
@@ -40,13 +37,7 @@ export default function WeddingInvitation() {
     }
 
     setGuestData(mockGuests[key] || mockGuests['12345'])
-    
-    // Handle skip parameter for testing
-    if (skipTo === 'invitation') {
-      setPhase('invitation')
-    } else {
-      setPhase('envelope')
-    }
+    setPhase('envelope')
   }
 
   useEffect(() => {
@@ -54,25 +45,15 @@ export default function WeddingInvitation() {
   }, [])
 
   const handleEnvelopeClick = () => {
-    setPhase('video')
+    setIsVideoPlaying(true)
     if (videoRef.current) {
       videoRef.current.play()
     }
   }
 
   const handleVideoEnded = () => {
+    setIsVideoPlaying(false)
     setPhase('invitation')
-  }
-
-  const toggleMusic = () => {
-    if (audioRef.current) {
-      if (isMusicPlaying) {
-        audioRef.current.pause()
-      } else {
-        audioRef.current.play()
-      }
-      setIsMusicPlaying(!isMusicPlaying)
-    }
   }
 
   // Validating Phase
@@ -120,168 +101,187 @@ export default function WeddingInvitation() {
   // Envelope Phase
   if (phase === 'envelope' && guestData) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-amber-50 via-orange-50 to-rose-50 p-4 overflow-hidden">
-        <div className="relative w-full max-w-2xl aspect-square flex items-center justify-center">
-          {/* Envelope Image */}
-          <div className="w-full h-full relative">
-            <img
-              src="/letter.png"
-              alt="Sobre de invitación"
-              className="w-full h-full object-cover rounded-lg shadow-2xl"
-            />
-
-            {/* Wax Seal Button */}
-            <button
-              onClick={handleEnvelopeClick}
-              className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 
-                         w-24 h-24 bg-gradient-to-b from-yellow-400 to-yellow-600 rounded-full 
-                         shadow-xl hover:shadow-2xl transition-all duration-300 
-                         flex items-center justify-center group cursor-pointer
-                         animate-pulse hover:animate-none"
-              aria-label="Abrir invitación"
+      <div className="min-h-screen flex items-center justify-center bg-black p-4 overflow-hidden">
+        <div className="w-full max-w-2xl relative aspect-square cursor-pointer" onClick={handleEnvelopeClick}>
+          {/* Video Overlay Container */}
+          <div className="absolute inset-0 rounded-2xl overflow-hidden" style={{ backgroundColor: 'rgb(26, 16, 8)' }}>
+            <video
+              ref={videoRef}
+              onEnded={handleVideoEnded}
+              playsInline
+              muted
+              preload="auto"
+              className="w-full h-full object-cover"
             >
-              <div className="absolute inset-0 rounded-full bg-yellow-500 opacity-0 group-hover:opacity-20 transition-opacity duration-300"></div>
-              <span className="text-4xl">💛</span>
-            </button>
+              <source src="/letter.mp4" type="video/mp4" />
+            </video>
+
+            {/* Overlay Gradient */}
+            <div className="absolute inset-0 bg-gradient-radial from-transparent via-transparent to-black opacity-30"></div>
+
+            {/* Tap to Open Prompt */}
+            {!isVideoPlaying && (
+              <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 pointer-events-none" style={{
+                background: 'radial-gradient(rgba(0, 0, 0, 0.35) 0%, transparent 70%)',
+              }}>
+                <p style={{
+                  fontFamily: "'Cormorant Garamond', Georgia, serif",
+                  fontSize: '0.85rem',
+                  letterSpacing: '0.25em',
+                  textTransform: 'uppercase',
+                  color: '#ffffff',
+                  textShadow: '0 1px 10px rgba(0,0,0,0.6), 0 0 3px rgba(0,0,0,0.4)',
+                  userSelect: 'none',
+                  margin: 0,
+                  paddingBottom: '20%',
+                }}>
+                  Tap to open
+                </p>
+                <div style={{
+                  width: '28px',
+                  height: '1px',
+                  background: 'linear-gradient(to right, transparent, rgba(255,255,255,0.5), transparent)',
+                }}></div>
+              </div>
+            )}
           </div>
         </div>
       </div>
     )
   }
 
-  // Video Phase
-  if (phase === 'video') {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-black overflow-hidden fixed inset-0">
-        <video
-          ref={videoRef}
-          onEnded={handleVideoEnded}
-          className="w-full h-full object-cover animate-fade-in"
-          playsInline
-        >
-          <source src="/letter.mp4" type="video/mp4" />
-        </video>
-      </div>
-    )
-  }
+
 
   // Invitation Phase
   if (phase === 'invitation' && guestData) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-amber-50 via-white to-rose-50 p-4 md:p-8">
-        {/* Audio element */}
-        <audio ref={audioRef} loop>
-          <source
-            src="data:audio/wav;base64,UklGRiYAAABXQVZFZm10IBAAAAABAAEAQB8AAAB9AAACABAAZGF0YQIAAAAAAA=="
-            type="audio/wav"
-          />
-        </audio>
-
-        {/* Music Control Button */}
-        <button
-          onClick={toggleMusic}
-          className="fixed bottom-8 right-8 w-14 h-14 rounded-full bg-gradient-to-b from-amber-400 to-amber-600 
-                     text-white shadow-lg hover:shadow-xl transition-all duration-300 z-50
-                     flex items-center justify-center hover:scale-110"
-          aria-label="Toggle música"
-        >
-          {isMusicPlaying ? (
-            <Volume2 className="w-6 h-6" />
-          ) : (
-            <VolumeX className="w-6 h-6" />
-          )}
-        </button>
-
+      <div className="min-h-screen bg-white text-gray-900 overflow-x-hidden">
         {/* Main Content */}
-        <div className="max-w-2xl mx-auto py-12 md:py-20 animate-fade-in">
-          {/* Header */}
+        <div className="max-w-3xl mx-auto px-6 py-16 md:py-24">
+          
+          {/* Header - Names */}
+          <div className="text-center mb-16">
+            <h1 className="text-5xl md:text-6xl font-serif font-light mb-4">
+              Javier Andrés
+            </h1>
+            <h2 className="text-5xl md:text-6xl font-serif font-light">
+              & Maria Zolis
+            </h2>
+          </div>
+
+          {/* Welcome Message */}
+          <div className="text-center mb-16">
+            <p className="text-lg text-gray-600 font-light leading-relaxed mb-2">
+              You are invited
+            </p>
+            <p className="text-center text-gray-700 font-serif text-xl">
+              Querido/a <span className="font-semibold">{guestData.nombre}</span>
+            </p>
+          </div>
+
+          {/* Scroll Indicator */}
           <div className="text-center mb-12">
-            <h1 className="text-4xl md:text-5xl font-serif font-bold text-gray-800 mb-2">
-              Javier Andrés Díaz Toyo
-            </h1>
-            <div className="flex items-center justify-center gap-4 mb-2">
-              <div className="h-px w-12 bg-amber-400"></div>
-              <span className="text-gray-600 font-light">&</span>
-              <div className="h-px w-12 bg-amber-400"></div>
-            </div>
-            <h1 className="text-4xl md:text-5xl font-serif font-bold text-gray-800">
-              Maria Zolis González Alcalá
-            </h1>
-          </div>
-
-          {/* Personal Message */}
-          <div className="bg-white/60 backdrop-blur-sm rounded-lg p-8 mb-12 border border-amber-200/50 shadow-lg">
-            <p className="text-center text-gray-700 leading-relaxed font-serif text-lg">
-              Querido/a{' '}
-              <span className="font-bold text-amber-800">{guestData.nombre}</span>,
-            </p>
-            <p className="text-center text-gray-700 leading-relaxed font-serif text-lg mt-4">
-              Nos complace invitarte a compartir este momento especial con nosotros.
-            </p>
-            <p className="text-center text-gray-600 text-sm mt-6">
-              Número de pases válidos: <span className="font-bold text-amber-800">{guestData.acompañantes}</span>
+            <p className="text-sm tracking-widest text-gray-500 uppercase">
+              Scroll to discover
             </p>
           </div>
 
-          {/* Details Grid */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-8 mb-12">
-            {/* Date */}
-            <div className="bg-white/60 backdrop-blur-sm rounded-lg p-6 border border-amber-200/50 shadow-md text-center">
-              <div className="text-3xl mb-2">📅</div>
-              <h3 className="font-serif font-bold text-gray-800 mb-2">Fecha</h3>
-              <p className="text-gray-600">Sábado, 15 de Noviembre</p>
-              <p className="text-sm text-gray-500">del 2025</p>
-            </div>
+          {/* Divider */}
+          <div className="w-px h-12 bg-gray-300 mx-auto mb-12"></div>
 
-            {/* Time */}
-            <div className="bg-white/60 backdrop-blur-sm rounded-lg p-6 border border-amber-200/50 shadow-md text-center">
-              <div className="text-3xl mb-2">🕐</div>
-              <h3 className="font-serif font-bold text-gray-800 mb-2">Hora</h3>
-              <p className="text-gray-600">Ceremonia: 16:30</p>
-              <p className="text-sm text-gray-500">Recepción: 18:00</p>
-            </div>
-
-            {/* Location */}
-            <div className="bg-white/60 backdrop-blur-sm rounded-lg p-6 border border-amber-200/50 shadow-md text-center">
-              <div className="text-3xl mb-2">📍</div>
-              <h3 className="font-serif font-bold text-gray-800 mb-2">Ubicación</h3>
-              <p className="text-gray-600">Hacienda Bella</p>
-              <p className="text-sm text-gray-500">Calle Principal 123</p>
-            </div>
-
-            {/* Dress Code */}
-            <div className="bg-white/60 backdrop-blur-sm rounded-lg p-6 border border-amber-200/50 shadow-md text-center">
-              <div className="text-3xl mb-2">👔</div>
-              <h3 className="font-serif font-bold text-gray-800 mb-2">Código de Vestimenta</h3>
-              <p className="text-gray-600">Formal</p>
-              <p className="text-sm text-gray-500">Elegancia Clásica</p>
+          {/* Save the Date */}
+          <div className="text-center mb-20">
+            <p className="text-sm tracking-widest text-gray-500 uppercase mb-8">Save the date</p>
+            <div className="text-6xl md:text-7xl font-light tracking-wider font-serif">
+              <span>15</span>
+              <span className="text-2xl block mt-2">11</span>
+              <span className="text-4xl block mt-2">2025</span>
             </div>
           </div>
+
+          {/* Divider */}
+          <div className="w-px h-12 bg-gray-300 mx-auto mb-12"></div>
+
+          {/* Ceremony Details */}
+          <div className="mb-20">
+            <p className="text-sm tracking-widest text-gray-500 uppercase mb-12">The Ceremony</p>
+            <div className="space-y-8">
+              <div>
+                <p className="text-xs tracking-widest text-gray-500 uppercase mb-2">Time</p>
+                <p className="text-2xl font-serif font-light">16:30</p>
+                <p className="text-sm text-gray-600 mt-1">Ceremony begins</p>
+              </div>
+              <div>
+                <p className="text-xs tracking-widest text-gray-500 uppercase mb-2">Location</p>
+                <p className="text-lg font-serif font-light">Hacienda Bella</p>
+                <p className="text-sm text-gray-600">Calle Principal 123</p>
+              </div>
+              <div>
+                <p className="text-xs tracking-widest text-gray-500 uppercase mb-2">Reception</p>
+                <p className="text-lg font-serif font-light">18:00</p>
+              </div>
+            </div>
+          </div>
+
+          {/* Divider */}
+          <div className="w-px h-12 bg-gray-300 mx-auto mb-12"></div>
+
+          {/* Dress Code */}
+          <div className="mb-20">
+            <p className="text-sm tracking-widest text-gray-500 uppercase mb-12">Dress Code</p>
+            <div className="space-y-6 text-center">
+              <div>
+                <p className="text-sm text-gray-600 mb-2">Formal Elegance</p>
+                <p className="text-gray-800 font-serif text-lg">Classical Elegance</p>
+              </div>
+              <div className="pt-6 border-t border-gray-200">
+                <p className="text-xs text-gray-500 italic">
+                  Black tie and formal attire respectfully requested
+                </p>
+              </div>
+            </div>
+          </div>
+
+          {/* Divider */}
+          <div className="w-px h-12 bg-gray-300 mx-auto mb-12"></div>
+
+          {/* Guest Count */}
+          <div className="mb-20 text-center">
+            <p className="text-sm tracking-widest text-gray-500 uppercase mb-4">Guest Count</p>
+            <p className="text-4xl font-serif font-light">{guestData.acompañantes}</p>
+            <p className="text-xs text-gray-600 mt-4">Plus ones included</p>
+          </div>
+
+          {/* Divider */}
+          <div className="w-px h-12 bg-gray-300 mx-auto mb-12"></div>
 
           {/* RSVP Section */}
-          <div className="bg-gradient-to-r from-amber-100 to-rose-100 rounded-lg p-8 text-center border-2 border-amber-200 shadow-lg">
-            <h3 className="font-serif font-bold text-gray-800 text-xl mb-3">
-              Confirmación de Asistencia
-            </h3>
-            <p className="text-gray-700 mb-4">
-              Por favor, confirma tu asistencia antes del 1 de Noviembre
+          <div className="text-center mb-20">
+            <p className="text-sm tracking-widest text-gray-500 uppercase mb-8">RSVP</p>
+            <p className="text-gray-700 mb-6">
+              Please respond by November 1, 2025
             </p>
             <a
               href="mailto:invitaciones@bodajavier-maria.com?subject=Confirmación%20de%20Asistencia"
-              className="inline-block bg-gradient-to-b from-amber-400 to-amber-600 text-white font-serif font-bold 
-                         py-3 px-8 rounded-lg hover:shadow-lg transition-all duration-300 hover:scale-105"
+              className="inline-block px-8 py-3 border border-gray-900 text-gray-900 font-serif hover:bg-gray-900 hover:text-white transition-all duration-300"
             >
-              Confirmar Asistencia
+              Confirm Attendance
             </a>
           </div>
 
-          {/* Footer */}
-          <div className="text-center mt-12 pt-8 border-t border-amber-200">
-            <p className="text-gray-600 font-serif italic">
-              "Que la alegría de este día sea el comienzo de muchos más juntos"
+          {/* Divider */}
+          <div className="w-px h-12 bg-gray-300 mx-auto mb-12"></div>
+
+          {/* Closing Message */}
+          <div className="text-center py-12">
+            <p className="text-sm text-gray-600 italic mb-4">
+              "May the joy of this day be the beginning of many more together"
             </p>
-            <p className="text-gray-500 text-sm mt-4">
-              Con amor, Javier & Maria
+            <p className="text-gray-700 font-serif">
+              With love,
+            </p>
+            <p className="text-gray-700 font-serif">
+              Javier & Maria
             </p>
           </div>
         </div>

@@ -40,7 +40,7 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="es" className="scroll-smooth">
-      <body className="antialiased bg-gradient-to-br from-amber-50 via-white to-rose-50">
+      <body className="antialiased bg-white">
         {children}
         {process.env.NODE_ENV === 'production' && <Analytics />}
       </body>
