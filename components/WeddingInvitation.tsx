@@ -61,24 +61,30 @@ export default function WeddingInvitation() {
   if (phase === 'validating') {
     if (validationError) {
       return (
-        <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-amber-50 to-orange-50 p-4">
-          <div className="text-center max-w-md">
-            <div className="mb-6">
-              <div className="w-20 h-20 mx-auto bg-red-100 rounded-full flex items-center justify-center mb-4">
-                <span className="text-4xl">✗</span>
-              </div>
+        <div className="min-h-screen flex items-center justify-center bg-white p-6">
+          <div className="max-w-md w-full">
+            <div className="text-center mb-12">
+              <div className="w-1 h-12 bg-gray-300 mx-auto mb-8"></div>
+              <h1 className="text-4xl font-serif font-light text-gray-900 mb-6">
+                Access Denied
+              </h1>
+              <div className="w-px h-8 bg-gray-200 mx-auto mb-8"></div>
             </div>
-            <h1 className="text-3xl font-serif font-bold text-gray-800 mb-4">
-              Acceso Denegado
-            </h1>
-            <p className="text-gray-600 mb-6 leading-relaxed">
-              Lo sentimos, esta invitación requiere un enlace válido. Por favor, verifica tu correo electrónico
-              y asegúrate de tener el enlace correcto.
-            </p>
-            <div className="bg-white/50 rounded-lg p-4 border border-gray-200">
-              <p className="text-sm text-gray-500">
-                Si tienes dudas, contacta con los novios directamente.
+
+            <div className="space-y-8 text-center">
+              <p className="text-sm text-gray-600 font-light leading-relaxed">
+                We're sorry, but this invitation requires a valid access code. 
+                Please check your email to ensure you have the correct link.
               </p>
+
+              <div className="pt-8 border-t border-gray-200">
+                <p className="text-xs tracking-widest text-gray-500 uppercase mb-4">
+                  Need help?
+                </p>
+                <p className="text-sm text-gray-600 font-light">
+                  Contact the couple directly for assistance.
+                </p>
+              </div>
             </div>
           </div>
         </div>
@@ -86,14 +92,54 @@ export default function WeddingInvitation() {
     }
 
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-amber-50 to-orange-50">
-        <div className="text-center">
-          <div className="mb-6 flex justify-center">
-            <div className="w-16 h-16 border-4 border-amber-300 border-t-amber-800 rounded-full animate-spin"></div>
+      <div className="min-h-screen flex flex-col items-center justify-center bg-white p-6">
+        <div className="text-center max-w-md">
+          {/* Logo/Icon Area */}
+          <div className="mb-16">
+            <div className="flex justify-center mb-8">
+              <div className="relative w-12 h-12">
+                <svg className="w-full h-full" viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
+                  <circle cx="50" cy="50" r="45" fill="none" stroke="currentColor" strokeWidth="2" opacity="0.2" />
+                  <circle
+                    cx="50"
+                    cy="50"
+                    r="45"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                    strokeDasharray="141 141"
+                    strokeDashoffset="0"
+                    className="animate-pulse"
+                    style={{
+                      animation: 'spin 3s linear infinite',
+                    }}
+                  />
+                  <path
+                    d="M50 30 L65 45 L50 60 L35 45 Z"
+                    fill="currentColor"
+                    opacity="0.6"
+                  />
+                </svg>
+              </div>
+            </div>
+
+            <div className="w-px h-12 bg-gray-300 mx-auto mb-12"></div>
           </div>
-          <p className="text-gray-600 font-serif text-lg">
-            Validando tu invitación...
+
+          {/* Loading Message */}
+          <p className="text-sm tracking-widest text-gray-500 uppercase mb-2">
+            Please wait
           </p>
+          <p className="text-gray-700 font-serif text-lg font-light">
+            Validating your invitation
+          </p>
+
+          {/* Animated dots */}
+          <div className="mt-8 flex justify-center gap-2">
+            <div className="w-2 h-2 bg-gray-400 rounded-full animate-pulse"></div>
+            <div className="w-2 h-2 bg-gray-400 rounded-full animate-pulse" style={{ animationDelay: '0.2s' }}></div>
+            <div className="w-2 h-2 bg-gray-400 rounded-full animate-pulse" style={{ animationDelay: '0.4s' }}></div>
+          </div>
         </div>
       </div>
     )
