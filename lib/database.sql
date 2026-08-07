@@ -19,6 +19,17 @@ CREATE POLICY "Allow public access via UUID" ON public.guests
   FOR SELECT
   USING (true);
 
+-- Allow inserting new guests (admin panel / seed script)
+CREATE POLICY "Allow public inserts" ON public.guests
+  FOR INSERT
+  WITH CHECK (true);
+
+-- Allow updating guests (RSVP from invitation page)
+CREATE POLICY "Allow public updates" ON public.guests
+  FOR UPDATE
+  USING (true)
+  WITH CHECK (true);
+
 -- Create a trigger to automatically update updated_at
 CREATE OR REPLACE FUNCTION public.update_updated_at_column()
 RETURNS TRIGGER AS $$

@@ -4,7 +4,7 @@ import './globals.css'
 
 export const metadata: Metadata = {
   title: 'Invitación de Boda | Javier & Maria',
-  description: 'Invitación de boda exclusiva para Javier Andrés Díaz Toyo & Maria Zolis González Alcalá. Por favor, ingresa tu código de acceso.',
+  description: 'Invitación de boda exclusiva para Javier Díaz & Maria Alcalá. Por favor, ingresa tu código de acceso.',
   generator: 'v0.app',
   icons: {
     icon: [
@@ -40,7 +40,11 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="es" className="scroll-smooth">
-      <body className="antialiased bg-white">
+      <body 
+        className="antialiased bg-white"
+        cz-shortcut-listen="true"
+        suppressHydrationWarning={true}
+      >
         {children}
         {process.env.NODE_ENV === 'production' && <Analytics />}
       </body>

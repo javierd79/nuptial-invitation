@@ -22,12 +22,14 @@ interface Countdown {
 
 type Phase = 'validating' | 'envelope' | 'video' | 'invitation'
 
-const WEDDING_DATE = new Date('2025-11-15T17:00:00').getTime()
+const WEDDING_DATE = new Date('2026-09-12T12:00:00').getTime()
 
 export default function WeddingInvitation() {
   const [phase, setPhase] = useState<Phase>('validating')
   const [guestData, setGuestData] = useState<GuestData | null>(null)
   const [validationError, setValidationError] = useState(false)
+  const [loadProgress, setLoadProgress] = useState(0)
+  const [videoUrl, setVideoUrl] = useState<string | null>(null)
   const [countdown, setCountdown] = useState<Countdown>({
     days: 0,
     hours: 0,
@@ -59,14 +61,13 @@ export default function WeddingInvitation() {
   }, [])
 
   // Validate guest with Supabase
-  const validateGuest = async () => {
+  const validateGuest = async (): Promise<boolean> => {
     const params = new URLSearchParams(window.location.search)
     const guestId = params.get('guest')
 
     if (!guestId) {
       setValidationError(true)
-      setPhase('validating')
-      return
+      return false
     }
 
     try {
@@ -79,22 +80,81 @@ export default function WeddingInvitation() {
 
       if (error || !data) {
         setValidationError(true)
-        setPhase('validating')
-        return
+        return false
       }
 
       setGuestData(data as GuestData)
-      setPhase('envelope')
+      return true
     } catch (err) {
       console.error('[v0] Error validating guest:', err)
       setValidationError(true)
-      setPhase('validating')
+      return false
+    }
+  }
+
+  // Preload and cache the video and letter image during the loading screen
+  const preloadAssets = async () => {
+    const img = new Image()
+    img.src = '/letter.png'
+
+    try {
+      setLoadProgress(0)
+      const res = await fetch('/letter.mp4')
+
+      if (!res.ok || !res.body) {
+        throw new Error('Video preload failed')
+      }
+
+      const total = Number(res.headers.get('content-length')) || 0
+      const reader = res.body.getReader()
+      const chunks: Uint8Array[] = []
+      let received = 0
+
+      while (true) {
+        const { done, value } = await reader.read()
+        if (done) break
+        if (value) {
+          chunks.push(value)
+          received += value.length
+          if (total > 0) {
+            setLoadProgress(Math.min(100, Math.round((received / total) * 100)))
+          }
+        }
+      }
+
+      const blob = new Blob(chunks, { type: 'video/mp4' })
+      setVideoUrl(URL.createObjectURL(blob))
+    } catch (err) {
+      console.error('[v0] Error preloading video:', err)
+      setVideoUrl(null)
+    } finally {
+      setLoadProgress(100)
     }
   }
 
   useEffect(() => {
-    validateGuest()
+    let cancelled = false
+
+    const init = async () => {
+      const isValid = await validateGuest()
+      if (cancelled || !isValid) return
+
+      await preloadAssets()
+      if (!cancelled) setPhase('envelope')
+    }
+
+    init()
+    return () => {
+      cancelled = true
+    }
   }, [])
+
+  // Clean up the cached video blob when leaving the page
+  useEffect(() => {
+    return () => {
+      if (videoUrl) URL.revokeObjectURL(videoUrl)
+    }
+  }, [videoUrl])
 
   const handleEnvelopeClick = () => {
     setPhase('video')
@@ -196,19 +256,17 @@ export default function WeddingInvitation() {
 
           <p className="text-sm tracking-widest text-gray-500 uppercase mb-2">Please wait</p>
           <p className="text-gray-700 font-serif text-lg font-light">
-            Validating your invitation
+            Preparing your invitation
           </p>
 
-          <div className="mt-8 flex justify-center gap-2">
-            <div className="w-2 h-2 bg-gray-400 rounded-full animate-pulse"></div>
-            <div
-              className="w-2 h-2 bg-gray-400 rounded-full animate-pulse"
-              style={{ animationDelay: '0.2s' }}
-            ></div>
-            <div
-              className="w-2 h-2 bg-gray-400 rounded-full animate-pulse"
-              style={{ animationDelay: '0.4s' }}
-            ></div>
+          <div className="mt-10">
+            <div className="w-56 h-px bg-gray-200 mx-auto overflow-hidden">
+              <div
+                className="h-full bg-gray-500 transition-all duration-200"
+                style={{ width: `${loadProgress}%` }}
+              ></div>
+            </div>
+            <p className="mt-4 text-xs tracking-widest text-gray-400 uppercase">{loadProgress}%</p>
           </div>
         </div>
       </div>
@@ -218,17 +276,15 @@ export default function WeddingInvitation() {
   // Envelope Phase
   if (phase === 'envelope' && guestData) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-black p-4 overflow-hidden">
-        <div className="w-full max-w-2xl relative aspect-square cursor-pointer" onClick={handleEnvelopeClick}>
+      <div className="h-dvh flex items-center justify-center bg-black p-4 overflow-hidden">
+        <div className="w-full h-full object-cover relative cursor-pointer" onClick={handleEnvelopeClick}>
           <div className="absolute inset-0 rounded-2xl overflow-hidden" style={{ backgroundColor: 'rgb(26, 16, 8)' }}>
-            <video
-              preload="auto"
-              playsInline
-              muted
+            <img
+              src="/letter.png"
+              alt="Wedding letter"
+              draggable={false}
               className="w-full h-full object-cover"
-            >
-              <source src="/letter.mp4" type="video/mp4" />
-            </video>
+            />
 
             <div className="absolute inset-0 bg-gradient-radial from-transparent via-transparent to-black opacity-30"></div>
 
@@ -251,7 +307,7 @@ export default function WeddingInvitation() {
                   paddingBottom: '20%',
                 }}
               >
-                Tap to open
+                Presiona para abrir
               </p>
               <div
                 style={{
@@ -278,9 +334,8 @@ export default function WeddingInvitation() {
           playsInline
           muted
           className="w-full h-full object-cover"
-        >
-          <source src="/letter.mp4" type="video/mp4" />
-        </video>
+          src={videoUrl ?? '/letter.mp4'}
+        ></video>
       </div>
     )
   }
@@ -341,7 +396,7 @@ export default function WeddingInvitation() {
               </div>
             </div>
             <p className="text-sm text-gray-600 font-light">
-              Saturday, November 15, 2025
+              Saturday, September 12, 2026
             </p>
           </div>
 
@@ -354,7 +409,7 @@ export default function WeddingInvitation() {
             <div className="space-y-8">
               <div>
                 <p className="text-xs tracking-widest text-gray-500 uppercase mb-2">Time</p>
-                <p className="text-2xl font-serif font-light">16:30</p>
+                <p className="text-2xl font-serif font-light">12:00</p>
                 <p className="text-sm text-gray-600 mt-1">Ceremony begins</p>
               </div>
               <div>
@@ -364,7 +419,7 @@ export default function WeddingInvitation() {
               </div>
               <div>
                 <p className="text-xs tracking-widest text-gray-500 uppercase mb-2">Reception</p>
-                <p className="text-lg font-serif font-light">18:00</p>
+                <p className="text-lg font-serif font-light">13:30</p>
               </div>
             </div>
           </div>
@@ -377,10 +432,10 @@ export default function WeddingInvitation() {
             <p className="text-sm tracking-widest text-gray-500 uppercase mb-12">The Day</p>
             <div className="space-y-6">
               {[
-                { time: '16:30', label: 'Arrival' },
-                { time: '17:00', label: 'Ceremony' },
-                { time: '18:30', label: 'Cocktail & Reception' },
-                { time: '20:00', label: 'Dinner' },
+                { time: '11:30', label: 'Arrival' },
+                { time: '12:00', label: 'Ceremony' },
+                { time: '13:30', label: 'Cocktail & Reception' },
+                { time: '15:00', label: 'Lunch' },
               ].map((item, idx) => (
                 <div key={idx} className="flex justify-between items-center border-b border-gray-100 pb-6">
                   <p className="text-sm font-serif font-light">{item.label}</p>
@@ -461,27 +516,25 @@ export default function WeddingInvitation() {
             <p className="text-sm tracking-widest text-gray-500 uppercase mb-8">RSVP</p>
             <p className="text-gray-700 mb-2 text-sm">Are you attending?</p>
             <p className="text-gray-600 mb-8 text-xs">
-              Please respond by October 15, 2025
+              Please respond by August 1, 2026
             </p>
             <div className="flex flex-col sm:flex-row gap-4 justify-center">
               <button
                 onClick={() => handleRSVP(true)}
-                disabled={guestData.is_attending !== null}
                 className={`px-8 py-3 border font-serif transition-all duration-300 ${
                   guestData.is_attending === true
                     ? 'border-gray-900 bg-gray-900 text-white'
-                    : 'border-gray-900 text-gray-900 hover:bg-gray-900 hover:text-white disabled:opacity-50'
+                    : 'border-gray-900 text-gray-900 hover:bg-gray-900 hover:text-white'
                 }`}
               >
                 I will attend
               </button>
               <button
                 onClick={() => handleRSVP(false)}
-                disabled={guestData.is_attending !== null}
                 className={`px-8 py-3 border font-serif transition-all duration-300 ${
                   guestData.is_attending === false
                     ? 'border-gray-900 bg-gray-900 text-white'
-                    : 'border-gray-300 text-gray-600 hover:bg-gray-100 disabled:opacity-50'
+                    : 'border-gray-300 text-gray-600 hover:bg-gray-100'
                 }`}
               >
                 Unable to attend
