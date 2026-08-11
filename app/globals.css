@@ -31,6 +31,27 @@
   }
 }
 
+.scroll-reveal {
+  opacity: 0;
+  transform: translateY(2.5rem);
+  transition: opacity 800ms cubic-bezier(0.22, 1, 0.36, 1),
+    transform 800ms cubic-bezier(0.22, 1, 0.36, 1);
+  will-change: opacity, transform;
+}
+
+.scroll-reveal.is-visible {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .scroll-reveal {
+    opacity: 1;
+    transform: none;
+    transition: none;
+  }
+}
+
 @layer utilities {
   .animate-fade-in {
     animation: fadeIn 0.8s ease-in-out forwards;

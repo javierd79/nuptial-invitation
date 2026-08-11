@@ -187,6 +187,27 @@ export default function WeddingInvitation() {
     }
   }, [videoUrl])
 
+  // Reveal each invitation section as it enters the viewport.
+  useEffect(() => {
+    if (phase !== 'invitation') return
+
+    const elements = document.querySelectorAll<HTMLElement>('.scroll-reveal')
+    const observer = new IntersectionObserver(
+      (entries) => {
+        entries.forEach((entry) => {
+          if (entry.isIntersecting) {
+            entry.target.classList.add('is-visible')
+            observer.unobserve(entry.target)
+          }
+        })
+      },
+      { threshold: 0.12, rootMargin: '0px 0px -8% 0px' },
+    )
+
+    elements.forEach((element) => observer.observe(element))
+    return () => observer.disconnect()
+  }, [phase])
+
   const handleEnvelopeClick = () => {
     setPhase('video')
     setTimeout(() => {
@@ -380,7 +401,7 @@ export default function WeddingInvitation() {
       >
         <div className="max-w-3xl mx-auto px-6 py-16 md:py-24">
           {/* Header - Names */}
-          <div className="text-center mb-16">
+          <div className="text-center mb-16 scroll-reveal">
             <h1 className="text-5xl md:text-6xl font-serif font-light mb-4">
               Javier Andrés
             </h1>
@@ -388,7 +409,7 @@ export default function WeddingInvitation() {
           </div>
 
           {/* Welcome Message */}
-          <div className="text-center mb-16">
+          <div className="text-center mb-16 scroll-reveal">
             <p className="text-lg text-gray-600 font-light leading-relaxed mb-2">
               You are invited
             </p>
@@ -406,7 +427,7 @@ export default function WeddingInvitation() {
           <div className="w-px h-12 bg-gray-300 mx-auto mb-12"></div>
 
           {/* Countdown */}
-          <div className="text-center mb-20">
+          <div className="text-center mb-20 scroll-reveal">
             <p className="text-sm tracking-widest text-gray-500 uppercase mb-8">Time until celebration</p>
             <div className="grid grid-cols-4 gap-4 mb-8">
               <div className="text-center">
@@ -435,7 +456,7 @@ export default function WeddingInvitation() {
           <div className="w-px h-12 bg-gray-300 mx-auto mb-12"></div>
 
           {/* Ceremony Details */}
-          <div className="mb-20">
+          <div className="mb-20 scroll-reveal">
             <p className="text-sm tracking-widest text-gray-500 uppercase mb-12">The Ceremony</p>
             <div className="space-y-8">
               <div>
@@ -459,7 +480,7 @@ export default function WeddingInvitation() {
           <div className="w-px h-12 bg-gray-300 mx-auto mb-12"></div>
 
           {/* Wedding Program */}
-          <div className="mb-20">
+          <div className="mb-20 scroll-reveal">
             <p className="text-sm tracking-widest text-gray-500 uppercase mb-12">The Day</p>
             <div className="space-y-6">
               {[
@@ -480,7 +501,7 @@ export default function WeddingInvitation() {
           <div className="w-px h-12 bg-gray-300 mx-auto mb-12"></div>
 
           {/* Dress Code */}
-          <div className="mb-20">
+          <div className="mb-20 scroll-reveal">
             <p className="text-sm tracking-widest text-gray-500 uppercase mb-12">Dress Code</p>
             <div className="space-y-8">
               <p className="text-center text-sm text-gray-700 italic">
@@ -505,7 +526,7 @@ export default function WeddingInvitation() {
           <div className="w-px h-12 bg-gray-300 mx-auto mb-12"></div>
 
           {/* Guest Info */}
-          <div className="mb-20">
+          <div className="mb-20 scroll-reveal">
             <p className="text-sm tracking-widest text-gray-500 uppercase mb-12">Your Details</p>
             <div className="space-y-8">
               <div>
@@ -531,7 +552,7 @@ export default function WeddingInvitation() {
           <div className="w-px h-12 bg-gray-300 mx-auto mb-12"></div>
 
           {/* About the Celebration */}
-          <div className="mb-20">
+          <div className="mb-20 scroll-reveal">
             <p className="text-sm tracking-widest text-gray-500 uppercase mb-8">The Celebration</p>
             <p className="text-center text-gray-700 leading-relaxed font-serif text-lg mb-6">
               &quot;In a moment of pure joy, we gather to celebrate love&apos;s greatest promise. Join us
@@ -543,7 +564,7 @@ export default function WeddingInvitation() {
           <div className="w-px h-12 bg-gray-300 mx-auto mb-12"></div>
 
           {/* Our Story */}
-          <section className="mb-20" aria-labelledby="our-story-title">
+          <section className="mb-20 scroll-reveal" aria-labelledby="our-story-title">
             <div className="mb-10 text-center">
               <p className="text-sm tracking-widest text-gray-500 uppercase mb-4">Our Story</p>
               <h2 id="our-story-title" className="font-serif text-3xl md:text-4xl font-light text-gray-900">
@@ -596,7 +617,7 @@ export default function WeddingInvitation() {
           <div className="w-px h-12 bg-gray-300 mx-auto mb-12"></div>
 
           {/* RSVP Section */}
-          <div className="text-center mb-20">
+          <div className="text-center mb-20 scroll-reveal">
             <p className="text-sm tracking-widest text-gray-500 uppercase mb-8">RSVP</p>
             <p className="text-gray-700 mb-2 text-sm">Are you attending?</p>
             <p className="text-gray-600 mb-8 text-xs">
@@ -630,7 +651,7 @@ export default function WeddingInvitation() {
           <div className="w-px h-12 bg-gray-300 mx-auto mb-12"></div>
 
           {/* Closing Message */}
-          <div className="text-center py-12">
+          <div className="text-center py-12 scroll-reveal">
             <p className="text-sm text-gray-600 italic mb-4">
               "May the joy of this day be the beginning of many more together"
             </p>
