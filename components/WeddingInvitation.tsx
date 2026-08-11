@@ -24,6 +24,37 @@ type Phase = 'validating' | 'envelope' | 'video' | 'invitation'
 
 const WEDDING_DATE = new Date('2025-11-15T17:00:00').getTime()
 
+const COUPLE_IMAGES = [
+  {
+    src: 'https://hebbkx1anhila5yf.public.blob.vercel-storage.com/WhatsApp%20Image%202026-08-05%20at%207.03.19%20PM-YUDyt5Ux4zitm5Csn35x4p7GsP94mi.jpeg',
+    alt: 'Javier y Maria compartiendo un beso junto al árbol de Navidad',
+  },
+  {
+    src: 'https://hebbkx1anhila5yf.public.blob.vercel-storage.com/WhatsApp%20Image%202026-08-05%20at%207.03.16%20PM-4PJ7c0Y8I56UympLmCPigCYuJPrKSw.jpeg',
+    alt: 'Retrato cercano de Javier y Maria sonriendo juntos',
+  },
+  {
+    src: 'https://hebbkx1anhila5yf.public.blob.vercel-storage.com/WhatsApp%20Image%202026-08-05%20at%207.01.05%20PM-yFIl4CXFF1zcYXAzVU6bmZdT6AYEtI.jpeg',
+    alt: 'Maria mostrando su anillo mientras sostiene un ramo de rosas',
+  },
+  {
+    src: 'https://hebbkx1anhila5yf.public.blob.vercel-storage.com/WhatsApp%20Image%202026-08-05%20at%207.03.18%20PM-xNi0qVQufN1w5sYrXcG5RC4t5Z5eYK.jpeg',
+    alt: 'Javier y Maria posando juntos en casa',
+  },
+  {
+    src: 'https://hebbkx1anhila5yf.public.blob.vercel-storage.com/WhatsApp%20Image%202026-08-05%20at%207.03.18%20PM%20%281%29-p9vyEqovAWhMR9MV23l5tjEEGz1qbD.jpeg',
+    alt: 'Javier y Maria sonriendo durante un momento cotidiano',
+  },
+  {
+    src: 'https://hebbkx1anhila5yf.public.blob.vercel-storage.com/WhatsApp%20Image%202026-08-05%20at%207.03.14%20PM-tJQvdXwlD3dIzohQkCsjmmRlWpJPQo.jpeg',
+    alt: 'Javier y Maria en un retrato íntimo',
+  },
+  {
+    src: 'https://hebbkx1anhila5yf.public.blob.vercel-storage.com/WhatsApp%20Image%202026-08-05%20at%207.03.20%20PM-2Upv1xEwoYco3Sj7mp45wcXHNPclql.jpeg',
+    alt: 'Javier y Maria juntos durante una noche al aire libre',
+  },
+]
+
 export default function WeddingInvitation() {
   const [phase, setPhase] = useState<Phase>('validating')
   const [guestData, setGuestData] = useState<GuestData | null>(null)
@@ -452,6 +483,59 @@ export default function WeddingInvitation() {
               for an evening of elegance, warmth, and unforgettable moments.&quot;
             </p>
           </div>
+
+          {/* Divider */}
+          <div className="w-px h-12 bg-gray-300 mx-auto mb-12"></div>
+
+          {/* Our Story */}
+          <section className="mb-20" aria-labelledby="our-story-title">
+            <div className="mb-10 text-center">
+              <p className="text-sm tracking-widest text-gray-500 uppercase mb-4">Our Story</p>
+              <h2 id="our-story-title" className="font-serif text-3xl md:text-4xl font-light text-gray-900">
+                Moments that brought us here
+              </h2>
+              <p className="mt-4 text-sm text-gray-600 font-light leading-relaxed">
+                A few memories from the beautiful journey we share with you.
+              </p>
+            </div>
+
+            <div className="grid grid-cols-2 gap-3 md:gap-4" role="list" aria-label="Photos of Javier and Maria">
+              <figure className="col-span-2 overflow-hidden rounded-[2rem] bg-gray-100" role="listitem">
+                <img
+                  src={COUPLE_IMAGES[0].src}
+                  alt={COUPLE_IMAGES[0].alt}
+                  loading="lazy"
+                  className="h-[25rem] w-full object-cover object-center transition-transform duration-700 hover:scale-[1.03] md:h-[32rem]"
+                />
+              </figure>
+              {COUPLE_IMAGES.slice(1, 5).map((image) => (
+                <figure key={image.src} className="overflow-hidden rounded-2xl bg-gray-100" role="listitem">
+                  <img
+                    src={image.src}
+                    alt={image.alt}
+                    loading="lazy"
+                    className="aspect-[4/5] w-full object-cover transition-transform duration-700 hover:scale-[1.04]"
+                  />
+                </figure>
+              ))}
+              <figure className="overflow-hidden rounded-2xl bg-gray-100" role="listitem">
+                <img
+                  src={COUPLE_IMAGES[5].src}
+                  alt={COUPLE_IMAGES[5].alt}
+                  loading="lazy"
+                  className="aspect-[4/5] w-full object-cover transition-transform duration-700 hover:scale-[1.04]"
+                />
+              </figure>
+              <figure className="overflow-hidden rounded-2xl bg-gray-100" role="listitem">
+                <img
+                  src={COUPLE_IMAGES[6].src}
+                  alt={COUPLE_IMAGES[6].alt}
+                  loading="lazy"
+                  className="aspect-[4/5] w-full object-cover object-center transition-transform duration-700 hover:scale-[1.04]"
+                />
+              </figure>
+            </div>
+          </section>
 
           {/* Divider */}
           <div className="w-px h-12 bg-gray-300 mx-auto mb-12"></div>
