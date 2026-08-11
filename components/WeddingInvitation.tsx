@@ -24,6 +24,16 @@ type Phase = 'validating' | 'envelope' | 'video' | 'invitation'
 
 const WEDDING_DATE = new Date('2026-09-12T12:00:00').getTime()
 
+const SECTION_META = [
+  { id: 'welcome', label: 'Welcome' },
+  { id: 'countdown', label: 'Date' },
+  { id: 'ceremony', label: 'Ceremony' },
+  { id: 'schedule', label: 'Schedule' },
+  { id: 'details', label: 'Details' },
+  { id: 'story', label: 'Story' },
+  { id: 'rsvp', label: 'RSVP' },
+]
+
 const COUPLE_IMAGES = [
   {
     src: 'https://hebbkx1anhila5yf.public.blob.vercel-storage.com/WhatsApp%20Image%202026-08-05%20at%207.03.19%20PM-YUDyt5Ux4zitm5Csn35x4p7GsP94mi.jpeg',
@@ -67,6 +77,7 @@ export default function WeddingInvitation() {
     minutes: 0,
     seconds: 0,
   })
+  const [activeSection, setActiveSection] = useState('welcome')
   const videoRef = useRef<HTMLVideoElement>(null)
   const invitationRef = useRef<HTMLDivElement>(null)
 
@@ -187,26 +198,35 @@ export default function WeddingInvitation() {
     }
   }, [videoUrl])
 
-  // Reveal each invitation section as it enters the viewport.
+  // Reveal content and track the active full-screen section.
   useEffect(() => {
-    if (phase !== 'invitation') return
+    if (phase !== 'invitation' || !invitationRef.current) return
 
-    const elements = document.querySelectorAll<HTMLElement>('.scroll-reveal')
+    const root = invitationRef.current
+    const revealElements = root.querySelectorAll<HTMLElement>('.scroll-reveal')
+    const sectionElements = root.querySelectorAll<HTMLElement>('.snap-section')
     const observer = new IntersectionObserver(
       (entries) => {
         entries.forEach((entry) => {
           if (entry.isIntersecting) {
             entry.target.classList.add('is-visible')
-            observer.unobserve(entry.target)
+            if (entry.target.classList.contains('snap-section')) {
+              setActiveSection(entry.target.id)
+            }
           }
         })
       },
-      { threshold: 0.12, rootMargin: '0px 0px -8% 0px' },
+      { root, threshold: 0.55 },
     )
 
-    elements.forEach((element) => observer.observe(element))
+    revealElements.forEach((element) => observer.observe(element))
+    sectionElements.forEach((element) => observer.observe(element))
     return () => observer.disconnect()
   }, [phase])
+
+  const scrollToSection = (id: string) => {
+    document.getElementById(id)?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+  }
 
   const handleEnvelopeClick = () => {
     setPhase('video')
@@ -397,16 +417,32 @@ export default function WeddingInvitation() {
     return (
       <div
         ref={invitationRef}
-        className="min-h-screen bg-white text-gray-900 overflow-x-hidden animate-in fade-in duration-700"
+        className="invitation-shell min-h-screen bg-[#f7f4ef] text-gray-900 overflow-hidden animate-in fade-in duration-700"
       >
-        <div className="max-w-3xl mx-auto px-6 py-16 md:py-24">
+        <nav className="section-indicator" aria-label="Invitation sections">
+          <span className="section-indicator-line" aria-hidden="true" />
+          {SECTION_META.map((section, index) => (
+            <button
+              key={section.id}
+              type="button"
+              aria-label={`Go to ${section.label}`}
+              aria-current={activeSection === section.id ? 'step' : undefined}
+              className={`section-dot ${activeSection === section.id ? 'is-active' : ''}`}
+              onClick={() => scrollToSection(section.id)}
+            >
+              <span className="section-dot-label">{String(index + 1).padStart(2, '0')} {section.label}</span>
+            </button>
+          ))}
+        </nav>
+        <div className="invitation-scroll snap-y snap-mandatory">
+          <div className="max-w-4xl mx-auto px-6">
           {/* Header - Names */}
-          <div className="text-center mb-16 scroll-reveal">
+          <section id="welcome" className="snap-section min-h-[100svh] flex flex-col justify-center text-center py-20 scroll-reveal">
             <h1 className="text-5xl md:text-6xl font-serif font-light mb-4">
               Javier Andrés
             </h1>
             <h2 className="text-5xl md:text-6xl font-serif font-light">& Maria Zolis</h2>
-          </div>
+          </section>
 
           {/* Welcome Message */}
           <div className="text-center mb-16 scroll-reveal">
@@ -427,7 +463,7 @@ export default function WeddingInvitation() {
           <div className="w-px h-12 bg-gray-300 mx-auto mb-12"></div>
 
           {/* Countdown */}
-          <div className="text-center mb-20 scroll-reveal">
+          <section id="countdown" className="snap-section min-h-[100svh] flex flex-col justify-center text-center py-20 scroll-reveal">
             <p className="text-sm tracking-widest text-gray-500 uppercase mb-8">Time until celebration</p>
             <div className="grid grid-cols-4 gap-4 mb-8">
               <div className="text-center">
@@ -450,13 +486,13 @@ export default function WeddingInvitation() {
             <p className="text-sm text-gray-600 font-light">
               Saturday, September 12, 2026
             </p>
-          </div>
+          </section>
 
           {/* Divider */}
           <div className="w-px h-12 bg-gray-300 mx-auto mb-12"></div>
 
           {/* Ceremony Details */}
-          <div className="mb-20 scroll-reveal">
+          <section id="ceremony" className="snap-section min-h-[100svh] flex flex-col justify-center py-20 scroll-reveal">
             <p className="text-sm tracking-widest text-gray-500 uppercase mb-12">The Ceremony</p>
             <div className="space-y-8">
               <div>
@@ -474,13 +510,13 @@ export default function WeddingInvitation() {
                 <p className="text-lg font-serif font-light">13:30</p>
               </div>
             </div>
-          </div>
+          </section>
 
           {/* Divider */}
           <div className="w-px h-12 bg-gray-300 mx-auto mb-12"></div>
 
           {/* Wedding Program */}
-          <div className="mb-20 scroll-reveal">
+          <section id="schedule" className="snap-section min-h-[100svh] flex flex-col justify-center py-20 scroll-reveal">
             <p className="text-sm tracking-widest text-gray-500 uppercase mb-12">The Day</p>
             <div className="space-y-6">
               {[
@@ -495,13 +531,13 @@ export default function WeddingInvitation() {
                 </div>
               ))}
             </div>
-          </div>
+          </section>
 
           {/* Divider */}
           <div className="w-px h-12 bg-gray-300 mx-auto mb-12"></div>
 
           {/* Dress Code */}
-          <div className="mb-20 scroll-reveal">
+          <section id="details" className="snap-section min-h-[100svh] flex flex-col justify-center py-20 scroll-reveal">
             <p className="text-sm tracking-widest text-gray-500 uppercase mb-12">Dress Code</p>
             <div className="space-y-8">
               <p className="text-center text-sm text-gray-700 italic">
@@ -520,7 +556,7 @@ export default function WeddingInvitation() {
                 </div>
               </div>
             </div>
-          </div>
+          </section>
 
           {/* Divider */}
           <div className="w-px h-12 bg-gray-300 mx-auto mb-12"></div>
@@ -564,7 +600,7 @@ export default function WeddingInvitation() {
           <div className="w-px h-12 bg-gray-300 mx-auto mb-12"></div>
 
           {/* Our Story */}
-          <section className="mb-20 scroll-reveal" aria-labelledby="our-story-title">
+          <section id="story" className="snap-section min-h-[100svh] flex flex-col justify-center py-20 scroll-reveal" aria-labelledby="our-story-title">
             <div className="mb-10 text-center">
               <p className="text-sm tracking-widest text-gray-500 uppercase mb-4">Our Story</p>
               <h2 id="our-story-title" className="font-serif text-3xl md:text-4xl font-light text-gray-900">
@@ -617,7 +653,7 @@ export default function WeddingInvitation() {
           <div className="w-px h-12 bg-gray-300 mx-auto mb-12"></div>
 
           {/* RSVP Section */}
-          <div className="text-center mb-20 scroll-reveal">
+          <section id="rsvp" className="snap-section min-h-[100svh] flex flex-col justify-center text-center py-20 scroll-reveal">
             <p className="text-sm tracking-widest text-gray-500 uppercase mb-8">RSVP</p>
             <p className="text-gray-700 mb-2 text-sm">Are you attending?</p>
             <p className="text-gray-600 mb-8 text-xs">
@@ -645,7 +681,7 @@ export default function WeddingInvitation() {
                 Unable to attend
               </button>
             </div>
-          </div>
+          </section>
 
           {/* Divider */}
           <div className="w-px h-12 bg-gray-300 mx-auto mb-12"></div>
@@ -658,6 +694,7 @@ export default function WeddingInvitation() {
             <p className="text-gray-700 font-serif">With love,</p>
             <p className="text-gray-700 font-serif">Javier & Maria</p>
           </div>
+        </div>
         </div>
       </div>
     )
