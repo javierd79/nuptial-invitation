@@ -311,7 +311,7 @@ export default function WeddingInvitation({ guestId }: WeddingInvitationProps) {
     if (selectedPhoto === null) return
     const onKey = (e: KeyboardEvent) => {
       if (e.key === 'Escape') setSelectedPhoto(null)
-    } 
+    }
     window.addEventListener('keydown', onKey)
     closePhotoRef.current?.focus()
     return () => window.removeEventListener('keydown', onKey)
