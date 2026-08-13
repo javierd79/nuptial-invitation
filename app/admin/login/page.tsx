@@ -18,7 +18,7 @@ export default function AdminLoginPage() {
 
     try {
       const supabase = createClient()
-      
+
       const { data, error: authError } = await supabase.auth.signInWithPassword({
         email,
         password,
@@ -31,7 +31,6 @@ export default function AdminLoginPage() {
       }
 
       if (data.session) {
-        // Login successful, redirect to admin
         router.push('/admin/dashboard')
       }
     } catch (err: any) {
@@ -40,73 +39,68 @@ export default function AdminLoginPage() {
     }
   }
 
+  const labelClasses = 'font-serif text-[0.65rem] uppercase tracking-[0.3em] text-ink-faint'
+  const inputClasses =
+    'mt-2 w-full border-b border-ink/20 bg-transparent pb-2 font-serif text-lg font-light text-ink placeholder:text-ink/25 focus:border-brass focus:outline-none'
+
   return (
-    <div className="min-h-screen bg-white flex items-center justify-center p-4">
-      <div className="max-w-md w-full">
-        {/* Header */}
-        <div className="text-center mb-12">
-          <div className="w-px h-12 bg-gray-300 mx-auto mb-8"></div>
-          <h1 className="text-4xl font-serif font-light text-gray-900 mb-2">
-            Admin Access
+    <div className="flex min-h-screen items-center justify-center bg-ivory p-6 text-ink">
+      <div className="w-full max-w-md">
+        <div className="mb-12 text-center">
+          <div className="mx-auto mb-8 h-12 w-px bg-ink/20" />
+          <h1 className="font-serif text-4xl font-light tracking-[-0.01em] text-ink">
+            Acceso administrativo
           </h1>
-          <p className="text-sm text-gray-500 tracking-widest uppercase">
-            Wedding Dashboard
+          <p className="mt-3 font-serif text-xs uppercase tracking-[0.3em] text-ink-faint">
+            Javier &amp; Maria · Invitación
           </p>
         </div>
 
-        {/* Login Form */}
-        <form onSubmit={handleLogin} className="space-y-6">
-          {/* Email Input */}
-          <div>
-            <label className="block text-xs tracking-widest text-gray-600 uppercase mb-3">
-              Email
-            </label>
+        <form onSubmit={handleLogin} className="space-y-8">
+          <label className="block">
+            <span className={labelClasses}>Correo electrónico</span>
             <input
               type="email"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               required
-              className="w-full px-4 py-3 border border-gray-200 rounded-sm focus:outline-none focus:border-gray-900 transition-colors"
-              placeholder="admin@example.com"
+              autoComplete="email"
+              placeholder="admin@correo.com"
+              className={inputClasses}
             />
-          </div>
+          </label>
 
-          {/* Password Input */}
-          <div>
-            <label className="block text-xs tracking-widest text-gray-600 uppercase mb-3">
-              Password
-            </label>
+          <label className="block">
+            <span className={labelClasses}>Contraseña</span>
             <input
               type="password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               required
-              className="w-full px-4 py-3 border border-gray-200 rounded-sm focus:outline-none focus:border-gray-900 transition-colors"
+              autoComplete="current-password"
               placeholder="••••••••"
+              className={inputClasses}
             />
-          </div>
+          </label>
 
-          {/* Error Message */}
           {error && (
-            <div className="p-4 bg-red-50 border border-red-200 rounded-sm">
-              <p className="text-sm text-red-700">{error}</p>
+            <div className="border border-red-700/25 bg-red-700/10 px-5 py-4 font-serif text-sm text-red-700/80">
+              {error}
             </div>
           )}
 
-          {/* Submit Button */}
           <button
             type="submit"
             disabled={loading}
-            className="w-full py-3 bg-gray-900 text-white font-serif hover:bg-gray-800 disabled:bg-gray-600 transition-colors rounded-sm"
+            className="w-full border border-ink bg-ink py-3 font-serif text-sm uppercase tracking-[0.25em] text-ivory transition-colors hover:bg-ink/90 disabled:cursor-not-allowed disabled:opacity-45"
           >
-            {loading ? 'Signing in...' : 'Sign In'}
+            {loading ? 'Entrando…' : 'Entrar'}
           </button>
         </form>
 
-        {/* Footer Note */}
-        <div className="mt-12 pt-8 border-t border-gray-200 text-center">
-          <p className="text-xs text-gray-500">
-            Authorized personnel only
+        <div className="mt-12 border-t border-ink/10 pt-8 text-center">
+          <p className="font-serif text-xs uppercase tracking-[0.3em] text-ink-faint">
+            Solo personal autorizado
           </p>
         </div>
       </div>

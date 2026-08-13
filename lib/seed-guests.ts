@@ -31,7 +31,7 @@ export async function seedGuests() {
   ]
 
   for (const guest of testGuests) {
-    const { data, error } = await supabase
+    const { data, error } = await (await supabase)
       .from('guests')
       .insert([guest])
       .select()

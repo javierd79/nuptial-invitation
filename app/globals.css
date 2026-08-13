@@ -33,16 +33,17 @@
 
 .invitation-shell {
   --ivory: #f7f4ef;
-  --stone: #e8e1d8;
-  --charcoal: #252321;
-  --burgundy: #5a2430;
+  --ink: #2b2723;
+  --ink-soft: #6f675d;
+  --brass: #a98f55;
+  background: var(--ivory);
+  color: var(--ink);
 }
 
 .invitation-scroll {
   height: 100svh;
   overflow-y: auto;
   overscroll-behavior-y: contain;
-  scroll-behavior: smooth;
   scrollbar-width: none;
 }
 
@@ -53,12 +54,9 @@
 .snap-section {
   position: relative;
   isolation: isolate;
+  scroll-snap-align: start;
+  scroll-snap-stop: always;
 }
-
-.snap-section:nth-of-type(4n + 1) { background: var(--ivory); }
-.snap-section:nth-of-type(4n + 2) { background: var(--stone); }
-.snap-section:nth-of-type(4n + 3) { background: var(--charcoal); color: var(--ivory); }
-.snap-section:nth-of-type(4n + 4) { background: var(--burgundy); color: var(--ivory); }
 
 .section-indicator {
   position: fixed;
@@ -76,42 +74,43 @@
   position: absolute;
   inset-block: 0.35rem;
   width: 1px;
-  background: color-mix(in srgb, currentColor 18%, transparent);
+  background: color-mix(in srgb, var(--ink) 16%, transparent);
 }
 
 .section-dot {
   position: relative;
   z-index: 1;
   display: flex;
-  width: 1.15rem;
-  height: 1.15rem;
+  width: 1.17rem;
+  height: 1.17rem;
   align-items: center;
   justify-content: center;
   border: 0;
-  border-radius: 999px;
+  border-radius: 0px;
   background: transparent;
   cursor: pointer;
+  color: var(--ink-soft);
+  z-index: 9999;
 }
 
-.section-dot::after {
-  content: '';
+.section-dot-core {
+  display: block;
   width: 0.4rem;
+  background: white;
   height: 0.4rem;
-  border: 1px solid currentColor;
-  border-radius: 999px;
-  background: var(--ivory);
-  transition: transform 300ms ease, background 300ms ease;
+  border: 0.04px solid currentColor;
+  border-radius: 0px;
+  rotate: 230deg;
+  transition: border-color 300ms ease;
 }
 
-.section-dot:hover::after,
-.section-dot:focus-visible::after,
-.section-dot.is-active::after {
-  transform: scale(1.7);
-  background: currentColor;
+.section-dot:hover .section-dot-core,
+.section-dot:focus-visible .section-dot-core {
+  border-color: var(--brass);
 }
 
 .section-dot:focus-visible {
-  outline: 2px solid currentColor;
+  outline: 2px solid var(--brass);
   outline-offset: 4px;
 }
 
@@ -119,7 +118,7 @@
   position: absolute;
   right: 1.8rem;
   width: max-content;
-  color: currentColor;
+  color: var(--ink-soft);
   font-size: 0.6rem;
   letter-spacing: 0.18em;
   opacity: 0;
@@ -131,21 +130,8 @@
 .section-dot:hover .section-dot-label,
 .section-dot:focus-visible .section-dot-label,
 .section-dot.is-active .section-dot-label {
-  opacity: 0.72;
-  transform: translateX(0);
-}
-
-.scroll-reveal {
-  opacity: 0;
-  transform: translateY(2.5rem);
-  transition: opacity 800ms cubic-bezier(0.22, 1, 0.36, 1),
-    transform 800ms cubic-bezier(0.22, 1, 0.36, 1);
-  will-change: opacity, transform;
-}
-
-.scroll-reveal.is-visible {
   opacity: 1;
-  transform: translateY(0);
+  transform: translateX(0);
 }
 
 @media (max-width: 640px) {
@@ -165,13 +151,7 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .invitation-scroll {
-    scroll-behavior: auto;
-  }
-
-  .scroll-reveal {
-    opacity: 1;
-    transform: none;
+  .section-dot-label {
     transition: none;
   }
 }
@@ -203,6 +183,16 @@
 }
 
 @custom-variant dark (&:is(.dark *));
+
+@theme {
+  --font-serif: var(--font-cormorant), Georgia, "Times New Roman", serif;
+  --color-ivory: #f7f4ef;
+  --color-ivory-deep: #efeae1;
+  --color-ink: #2b2723;
+  --color-ink-soft: #6f675d;
+  --color-ink-faint: #756b5d;
+  --color-brass: #a98f55;
+}
 
 @theme inline {
   --color-sidebar-ring: var(--sidebar-ring);

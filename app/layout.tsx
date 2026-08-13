@@ -1,11 +1,20 @@
 import { Analytics } from '@vercel/analytics/next'
+import { Cormorant_Garamond } from 'next/font/google'
 import type { Metadata, Viewport } from 'next'
 import './globals.css'
 
+const cormorant = Cormorant_Garamond({
+  subsets: ['latin'],
+  weight: ['300', '400', '500', '600'],
+  style: ['normal', 'italic'],
+  variable: '--font-cormorant',
+  display: 'swap',
+})
+
 export const metadata: Metadata = {
-  title: 'Invitación de Boda | Javier & Maria',
-  description: 'Invitación de boda exclusiva para Javier Díaz & Maria Alcalá. Por favor, ingresa tu código de acceso.',
-  generator: 'v0.app',
+  title: 'Invitación de Boda | Javier Andrés & Maria Zolis',
+  description:
+    'Invitación de boda de Javier Andrés & Maria Zolis. Sábado, 12 de septiembre de 2026.',
   icons: {
     icon: [
       {
@@ -40,9 +49,8 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="es" className="scroll-smooth">
-      <body 
-        className="antialiased bg-white"
-        cz-shortcut-listen="true"
+      <body
+        className={`${cormorant.variable} antialiased bg-white`}
         suppressHydrationWarning={true}
       >
         {children}

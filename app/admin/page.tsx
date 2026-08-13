@@ -11,12 +11,10 @@ export default function AdminPage() {
   }, [router])
 
   return (
-    <div className="min-h-screen bg-white flex items-center justify-center">
+    <div className="flex min-h-screen items-center justify-center bg-ivory text-ink">
       <div className="text-center">
-        <div className="animate-pulse">
-          <div className="w-px h-12 bg-gray-300 mx-auto mb-4"></div>
-        </div>
-        <p className="text-gray-600">Redirecting to login...</p>
+        <div className="mx-auto mb-4 h-12 w-px animate-pulse bg-ink/20" />
+        <p className="font-serif text-sm italic text-ink-soft">Redirigiendo a acceso…</p>
       </div>
     </div>
   )
