@@ -537,13 +537,13 @@ export default function AdminDashboard() {
           <TabsList variant="line" className="mb-10 h-auto w-fit border-b border-ink/10">
             <TabsTrigger
               value="invitados"
-              className="h-auto px-8 py-3 font-serif text-xs uppercase tracking-[0.3em] text-ink-faint data-active:text-ink data-active:after:bg-brass"
+              className="h-auto px-8 py-3 font-serif text-xs uppercase tracking-[0.3em] text-ink-faint data-active:text-ink data-active:after:bg-brass hover:text-yellow-400 hover:cursor-pointer"
             >
               Invitados
             </TabsTrigger>
             <TabsTrigger
               value="regalos"
-              className="h-auto px-8 py-3 font-serif text-xs uppercase tracking-[0.3em] text-ink-faint data-active:text-ink data-active:after:bg-brass"
+              className="h-auto px-8 py-3 font-serif text-xs uppercase tracking-[0.3em] text-ink-faint data-active:text-ink data-active:after:bg-brass hover:text-yellow-400 hover:cursor-pointer"
             >
               Regalos recibidos
             </TabsTrigger>
