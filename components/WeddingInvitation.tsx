@@ -318,13 +318,20 @@ export default function WeddingInvitation({ guestId }: WeddingInvitationProps) {
     return () => window.removeEventListener('keydown', onKey)
   }, [selectedPhoto])
 
-  const palette = [
+  const boyPalette = [
+    "#7D563E", // Lila
+    "#101E32",
+    "#222222", // Azul claro
+    "#1E4332", // Verde salvia
+    "#656565", // Gris
+  ]
+
+  const girlPalette = [
     "#C8A2C8", // Lila
     "#7CB9E8", // Azul claro
     "#8FBC8F", // Verde salvia
     "#FF91A4", // Rosa
     "#F4D03F", // Amarillo
-    "#808080", // Gris
   ]
 
   // Calculate countdown
@@ -936,7 +943,19 @@ export default function WeddingInvitation({ guestId }: WeddingInvitationProps) {
                       Código de vestimenta
                     </span>
                     <span className="font-serif text-2xl font-light text-ink">Semiformal/Formal</span>
-                    <ColorStack colors={palette} overlap={18} />
+                    <span className="my-1 font-serif text-xs uppercase tracking-[0.3em] text-ink-faint">
+                      Paletas de colores
+                    </span>
+                    <div className="flex gap-4 flex-col sm:flex-row my-1">
+                      <div>
+                        <span className="font-serif text-xs uppercase tracking-[0.3em] text-ink-faint">Damas</span>
+                        <ColorStack colors={girlPalette} overlap={18} />
+                      </div>
+                      <div>
+                        <span className="font-serif text-xs uppercase tracking-[0.3em] text-ink-faint">Caballeros</span>
+                        <ColorStack colors={boyPalette} overlap={18} />
+                      </div>
+                    </div>
                     <p className="mt-2 max-w-xs font-serif text-sm font-light italic leading-relaxed text-ink-soft">
                       Elegante, cómodo y fresco.
                     </p>
