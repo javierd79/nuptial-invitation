@@ -7,7 +7,7 @@ export default function AntiDevtools() {
     if (process.env.NODE_ENV !== 'production') return
 
     const reload = () => location.reload()
-    const SIZE_THRESHOLD = 120
+    const SIZE_THRESHOLD = 160
     const DEBUGGER_THRESHOLD = 150
 
     const handleKey = (e: KeyboardEvent) => {
@@ -35,6 +35,7 @@ export default function AntiDevtools() {
     }
 
     const detectSize = () => {
+      if (window.innerWidth < 768) return
       const widthDiff = window.outerWidth - window.innerWidth
       const heightDiff = window.outerHeight - window.innerHeight
       if (widthDiff > SIZE_THRESHOLD || heightDiff > SIZE_THRESHOLD) reload()
