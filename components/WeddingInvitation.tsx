@@ -18,6 +18,7 @@ interface GuestData {
   gift_amount_bs: number | null
   is_godparent: boolean
   is_attending: boolean | null
+  gender: string | null
 }
 
 interface Countdown {
@@ -838,7 +839,11 @@ export default function WeddingInvitation({ guestId }: WeddingInvitationProps) {
               <Section id="greeting">
                 <Eyebrow className="mb-8">Una invitación para ti</Eyebrow>
                 <h2 className="font-serif text-2xl font-light text-ink md:text-3xl">
-                  Querido/a
+                  {guestData.gender === 'female'
+                    ? 'Querida'
+                    : guestData.gender === 'male'
+                      ? 'Querido'
+                      : 'Querido/a'}
                 </h2>
                 <span className="font-serif text-2xl text-ink md:text-3xl font-medium">{guestData.full_name}</span>
                 <p className="mt-6 max-w-md font-serif text-lg font-light leading-relaxed text-ink-soft">
@@ -950,7 +955,7 @@ export default function WeddingInvitation({ guestId }: WeddingInvitationProps) {
                     </div>
                     {guestData.is_godparent && (
                       <p className="font-serif text-base font-light italic text-brass">
-                        Padrino de la boda
+                        {guestData.gender === 'female' ? 'Madrina de la boda' : 'Padrino de la boda'}
                       </p>
                     )}
                   </div>

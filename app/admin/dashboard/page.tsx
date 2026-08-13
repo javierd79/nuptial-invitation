@@ -19,6 +19,7 @@ interface Guest {
   gift_amount_bs: number | null
   is_godparent: boolean
   is_attending: boolean | null
+  gender: string | null
   created_at: string
   updated_at: string | null
 }
@@ -73,6 +74,7 @@ export default function AdminDashboard() {
     is_godparent: false,
     is_courtesy: false,
     courtesy_plus_ones: '0',
+    gender: '',
   })
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null)
   const [copiedId, setCopiedId] = useState<string | null>(null)
@@ -181,6 +183,7 @@ export default function AdminDashboard() {
           is_godparent: formData.is_godparent,
           is_courtesy: formData.is_courtesy,
           courtesy_plus_ones: formData.is_courtesy ? parseInt(formData.courtesy_plus_ones) || 0 : 0,
+          gender: formData.gender || null,
         },
       ])
 
@@ -196,6 +199,7 @@ export default function AdminDashboard() {
           is_godparent: false,
           is_courtesy: false,
           courtesy_plus_ones: '0',
+          gender: '',
         })
         loadGuests()
       }
@@ -255,6 +259,20 @@ export default function AdminDashboard() {
 
     if (error) {
       console.error('Error updating courtesy status:', error)
+      loadGuests()
+    }
+  }
+
+  const updateGender = async (guest: Guest, gender: string) => {
+    const next = guest.gender === gender ? null : gender
+
+    setGuests((prev) => prev.map((g) => (g.id === guest.id ? { ...g, gender: next } : g)))
+
+    const supabase = createClient()
+    const { error } = await supabase.from('guests').update({ gender: next }).eq('id', guest.id)
+
+    if (error) {
+      console.error('Error updating gender:', error)
       loadGuests()
     }
   }
@@ -461,8 +479,27 @@ export default function AdminDashboard() {
                 onChange={(e) => setFormData({ ...formData, is_godparent: e.target.checked })}
                 className="h-4 w-4 border-ink/30 accent-brass"
               />
-              <span className="font-serif text-sm uppercase tracking-[0.25em] text-ink">Es padrino</span>
+              <span className="font-serif text-sm uppercase tracking-[0.25em] text-ink">Es padrino/madrina</span>
             </label>
+            <div className="flex flex-col justify-center pt-4">
+              <span className="font-serif text-xs uppercase tracking-[0.25em] text-ink-faint">Sexo</span>
+              <div className="mt-2 flex gap-3">
+                {(['female', 'male'] as const).map((value) => (
+                  <button
+                    key={value}
+                    type="button"
+                    onClick={() => setFormData({ ...formData, gender: formData.gender === value ? '' : value })}
+                    className={`border px-4 py-1.5 font-serif text-sm uppercase tracking-[0.2em] transition-colors ${
+                      formData.gender === value
+                        ? 'border-ink bg-ink text-ivory'
+                        : 'border-ink/20 text-ink-soft hover:border-ink/50 hover:text-ink'
+                    }`}
+                  >
+                    {value === 'female' ? 'Mujer' : 'Hombre'}
+                  </button>
+                ))}
+              </div>
+            </div>
             <label className="flex items-center gap-3 pt-4">
               <input
                 type="checkbox"
@@ -584,6 +621,22 @@ export default function AdminDashboard() {
                         <td className="px-6 py-4">
                           <p className="font-serif text-base font-light text-ink">{guest.full_name}</p>
                           <p className="mt-0.5 font-serif text-xs italic text-ink-faint">{formatDate(guest.created_at)}</p>
+                          <div className="mt-2 flex gap-2">
+                            {(['female', 'male'] as const).map((value) => (
+                              <button
+                                key={value}
+                                type="button"
+                                onClick={() => updateGender(guest, value)}
+                                className={`border px-2.5 py-0.5 font-serif text-[0.65rem] uppercase tracking-[0.15em] transition-colors ${
+                                  guest.gender === value
+                                    ? 'border-ink bg-ink text-ivory'
+                                    : 'border-ink/20 text-ink-faint hover:border-ink/50 hover:text-ink'
+                                }`}
+                              >
+                                {value === 'female' ? 'Mujer' : 'Hombre'}
+                              </button>
+                            ))}
+                          </div>
                         </td>
                         <td className="px-6 py-4 font-serif text-sm font-light text-ink-soft">{guest.email}</td>
                         <td className="px-6 py-4">
@@ -636,7 +689,7 @@ export default function AdminDashboard() {
                         <td className="px-6 py-4">
                           {guest.is_godparent ? (
                             <span className="inline-block rounded-full border border-brass/40 px-3 py-1 font-serif text-[0.65rem] uppercase tracking-[0.2em] text-brass">
-                              Padrino
+                              {guest.gender === 'female' ? 'Madrina' : 'Padrino'}
                             </span>
                           ) : (
                             <span className="font-serif text-sm text-ink-faint">—</span>

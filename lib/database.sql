@@ -65,3 +65,8 @@ ALTER PUBLICATION supabase_realtime ADD TABLE public.guests;
 ALTER TABLE public.guests
   ADD COLUMN IF NOT EXISTS is_courtesy BOOLEAN DEFAULT FALSE,
   ADD COLUMN IF NOT EXISTS courtesy_plus_ones INT DEFAULT 0;
+
+-- Gender for personalizing the invitation (saludo y padrino/madrina).
+-- Values: 'male' | 'female'; NULL = not assigned. Run in the Supabase SQL editor.
+ALTER TABLE public.guests
+  ADD COLUMN IF NOT EXISTS gender TEXT;
