@@ -63,8 +63,7 @@ const SECRET_MESSAGE =
 const AGENDA = [
   { time: '1:15 PM', label: 'Entrada' },
   { time: '2:00 PM', label: 'Ceremonia' },
-  { time: '4:00 PM', label: 'Recepción' },
-  { time: '5:00 PM', label: 'Brindis' },
+  { time: '4:00 PM', label: 'Brindis' },
 ]
 
 const SECTION_META = [
