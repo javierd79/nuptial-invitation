@@ -1,6 +1,7 @@
 import { Analytics } from '@vercel/analytics/next'
 import { Cormorant_Garamond } from 'next/font/google'
 import type { Metadata, Viewport } from 'next'
+import AntiDevtools from '@/components/AntiDevtools'
 import './globals.css'
 
 const cormorant = Cormorant_Garamond({
@@ -88,6 +89,7 @@ export default function RootLayout({
         className={`${cormorant.variable} antialiased bg-white`}
         suppressHydrationWarning={true}
       >
+        <AntiDevtools />
         {children}
         {process.env.NODE_ENV === 'production' && <Analytics />}
       </body>
