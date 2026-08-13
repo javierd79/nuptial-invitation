@@ -806,6 +806,32 @@ export default function WeddingInvitation({ guestId }: WeddingInvitationProps) {
                 <p className="mt-6 font-serif text-base italic tracking-wide text-ink-soft">
                   Juntos hasta el Cielo
                 </p>
+
+                <motion.div
+                  aria-hidden="true"
+                  className="pointer-events-none absolute inset-x-0 bottom-8 flex flex-col items-center gap-2 text-ink-faint"
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  transition={{ delay: 0.8, duration: 0.8 }}
+                >
+                  <span className="font-serif text-[0.6rem] uppercase tracking-[0.32em]">
+                    Desliza hacia abajo
+                  </span>
+                  <motion.svg
+                    width="18"
+                    height="18"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="1.5"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    animate={{ y: [0, 6, 0] }}
+                    transition={{ repeat: Infinity, duration: 1.6, ease: 'easeInOut' }}
+                  >
+                    <path d="M6 9l6 6 6-6" />
+                  </motion.svg>
+                </motion.div>
               </Section>
 
               {/* Personalized Greeting */}
