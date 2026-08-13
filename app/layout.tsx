@@ -11,10 +11,45 @@ const cormorant = Cormorant_Garamond({
   display: 'swap',
 })
 
+const siteUrl = new URL(
+  process.env.NEXT_PUBLIC_SITE_URL ??
+    (process.env.VERCEL_PROJECT_PRODUCTION_URL
+      ? `https://${process.env.VERCEL_PROJECT_PRODUCTION_URL}`
+      : 'http://localhost:3000'),
+)
+
 export const metadata: Metadata = {
-  title: 'Invitación de Boda | Javier Andrés & Maria Zolis',
+  metadataBase: siteUrl,
+  title: {
+    default: 'Invitación de Boda | Javier Andrés & Maria Zolis',
+    template: '%s | Javier & Maria',
+  },
   description:
     'Invitación de boda de Javier Andrés & Maria Zolis. Sábado, 12 de septiembre de 2026.',
+  openGraph: {
+    type: 'website',
+    url: '/',
+    siteName: 'Javier & Maria',
+    locale: 'es_VE',
+    title: 'Javier Andrés & Maria Zolis · Nos casamos',
+    description:
+      'Sábado, 12 de septiembre de 2026. Abre tu invitación y confirma tu asistencia.',
+    images: [
+      {
+        url: '/og-image.jpg',
+        width: 1200,
+        height: 630,
+        alt: 'Carta de invitación de Javier & Maria',
+      },
+    ],
+  },
+  twitter: {
+    card: 'summary_large_image',
+    title: 'Javier Andrés & Maria Zolis · Nos casamos',
+    description:
+      'Sábado, 12 de septiembre de 2026. Abre tu invitación y confirma tu asistencia.',
+    images: ['/og-image.jpg'],
+  },
   icons: {
     icon: [
       {
