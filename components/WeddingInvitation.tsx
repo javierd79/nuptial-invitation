@@ -1267,7 +1267,7 @@ export default function WeddingInvitation({ guestId }: WeddingInvitationProps) {
                           >
                             <span>
                               <span className="block font-serif text-base font-light uppercase tracking-[0.15em] text-ink">
-                                Regalo en fiesta
+                                Regalo en físico
                               </span>
                               <span className="mt-1 block font-serif text-xs italic text-ink-soft">
                                 El día de la celebración.
