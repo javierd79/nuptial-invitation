@@ -57,6 +57,12 @@ const BINANCE = {
   email: 'javierdiazt406@icloud.com',
 }
 
+const PAYPAL = {
+  handle: '@JavierD79',
+  email: 'javierdiazt406@icloud.com',
+  holder: 'Javier Díaz',
+}
+
 const SECRET_MESSAGE =
   'Shh… un secreto así no se cuenta antes del gran día. Tu presencia ya es el mejor regalo.'
 
@@ -279,7 +285,7 @@ export default function WeddingInvitation({ guestId }: WeddingInvitationProps) {
   const [rsvpClosed, setRsvpClosed] = useState(false)
   const [selectedPhoto, setSelectedPhoto] = useState<number | null>(null)
   const [giftMode, setGiftMode] = useState<'inmediato' | 'fiesta' | null>(null)
-  const [immediateGift, setImmediateGift] = useState<'pago_movil' | 'binance' | null>(null)
+  const [immediateGift, setImmediateGift] = useState<'pago_movil' | 'binance' | 'paypal' | null>(null)
   const [partyGift, setPartyGift] = useState<'secreto' | 'fisico' | 'efectivo' | null>(null)
   const [giftDescription, setGiftDescription] = useState('')
   const [giftCashAmount, setGiftCashAmount] = useState('')
@@ -300,7 +306,7 @@ export default function WeddingInvitation({ guestId }: WeddingInvitationProps) {
     if (guestData.gift_type === 'fisico' || guestData.gift_type === 'efectivo') {
       setGiftMode('fiesta')
       setPartyGift(guestData.gift_type)
-    } else if (guestData.gift_type === 'pago_movil' || guestData.gift_type === 'binance') {
+    } else if (guestData.gift_type === 'pago_movil' || guestData.gift_type === 'binance' || guestData.gift_type === 'paypal') {
       setGiftMode('inmediato')
       setImmediateGift(guestData.gift_type)
       setGiftUsdtAmount(guestData.gift_amount_usd != null ? formatVzAmount(String(guestData.gift_amount_usd)) : '')
@@ -526,6 +532,12 @@ export default function WeddingInvitation({ guestId }: WeddingInvitationProps) {
     } else if (giftMode === 'inmediato' && immediateGift === 'binance') {
       const amount = parseVzAmount(giftUsdtAmount)
       payload.gift_type = amount > 0 ? 'binance' : null
+      payload.gift_amount_usd = amount > 0 ? amount : null
+      payload.gift_amount_bs = null
+      payload.gift_description = null
+    } else if (giftMode === 'inmediato' && immediateGift === 'paypal') {
+      const amount = parseVzAmount(giftUsdtAmount)
+      payload.gift_type = amount > 0 ? 'paypal' : null
       payload.gift_amount_usd = amount > 0 ? amount : null
       payload.gift_amount_bs = null
       payload.gift_description = null
@@ -1312,6 +1324,26 @@ export default function WeddingInvitation({ guestId }: WeddingInvitationProps) {
                               className="block h-1.5 w-1.5 shrink-0 rotate-45 bg-brass transition-transform duration-300 group-hover:scale-125"
                             />
                           </motion.button>
+                          <motion.button
+                            type="button"
+                            onClick={() => setImmediateGift('paypal')}
+                            whileTap={{ scale: 0.98 }}
+                            transition={{ type: 'spring', bounce: 0, duration: 0.3 }}
+                            className="group flex w-full items-center justify-between gap-4 rounded-2xl border border-ink/10 bg-ivory-deep/60 px-6 py-5 text-left transition-colors hover:border-brass/60 hover:bg-ivory-deep"
+                          >
+                            <span>
+                              <span className="block font-serif text-base font-light uppercase tracking-[0.15em] text-ink">
+                                PayPal
+                              </span>
+                              <span className="mt-1 block font-serif text-xs italic text-ink-soft">
+                                En USD, desde cualquier país.
+                              </span>
+                            </span>
+                            <span
+                              aria-hidden="true"
+                              className="block h-1.5 w-1.5 shrink-0 rotate-45 bg-brass transition-transform duration-300 group-hover:scale-125"
+                            />
+                          </motion.button>
                         </div>
                       </GiftPanel>
                     ) : giftMode === 'inmediato' && immediateGift === 'pago_movil' ? (
@@ -1367,7 +1399,59 @@ export default function WeddingInvitation({ guestId }: WeddingInvitationProps) {
                         />
                         <GiftFeedback saved={giftSaved} error={giftError} />
                       </GiftPanel>
-                    ) : giftMode === 'inmediato' ? (
+                    ) : giftMode === 'inmediato' && immediateGift === 'paypal' ? (
+                      <GiftPanel key="gift-paypal">
+                        <GiftBack onClick={() => setImmediateGift(null)} />
+                        <div className="overflow-hidden rounded-2xl border border-ink/10 bg-ivory-deep/60">
+                          {(
+                            [
+                              ['Usuario', PAYPAL.handle],
+                              ['Correo', PAYPAL.email],
+                              ['Titular', PAYPAL.holder],
+                            ] as const
+                          ).map(([label, value], idx) => (
+                            <div
+                              key={label}
+                              className={`flex items-baseline justify-between gap-4 px-6 py-3.5 ${idx < 2 ? 'border-b border-ink/10' : ''
+                                }`}
+                            >
+                              <span className="font-serif text-[0.65rem] uppercase tracking-[0.3em] text-ink-faint">
+                                {label}
+                              </span>
+                              <span className="font-serif text-base font-light text-ink">{value}</span>
+                            </div>
+                          ))}
+                        </div>
+                        <p className="mt-6 font-serif text-xs italic text-ink-soft">
+                          PayPal en USD. Menciona tu nombre al realizar el envío.
+                        </p>
+                        <label className="mt-4 block">
+                          <span className="font-serif text-[0.65rem] uppercase tracking-[0.3em] text-ink-faint">
+                            Monto en USD
+                          </span>
+                          <span className="mt-2 flex items-baseline gap-2 border-b border-ink/20 pb-2 focus-within:border-brass">
+                            <span className="font-serif text-2xl font-light text-ink">$</span>
+                            <input
+                              type="text"
+                              inputMode="decimal"
+                              value={giftUsdtAmount}
+                              onChange={(e) => {
+                                setGiftUsdtAmount(formatVzAmount(e.target.value))
+                                setGiftSaved(false)
+                              }}
+                              placeholder="0,00"
+                              className="w-full bg-transparent font-serif text-2xl font-light text-ink placeholder:text-ink/25 focus:outline-none"
+                            />
+                          </span>
+                        </label>
+                        <GiftSaveButton
+                          onSave={handleSaveGift}
+                          disabled={giftStatus === 'saving' || giftUsdtAmount.trim() === ''}
+                          saving={giftStatus === 'saving'}
+                        />
+                        <GiftFeedback saved={giftSaved} error={giftError} />
+                      </GiftPanel>
+                    ) : giftMode === 'inmediato' && immediateGift === 'binance' ? (
                       <GiftPanel key="gift-binance">
                         <GiftBack onClick={() => setImmediateGift(null)} />
                         <div className="overflow-hidden rounded-2xl border border-ink/10 bg-ivory-deep/60">

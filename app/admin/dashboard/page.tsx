@@ -58,6 +58,7 @@ const GIFT_TYPES = [
   { value: 'efectivo', label: 'Efectivo' },
   { value: 'pago_movil', label: 'Pago móvil' },
   { value: 'binance', label: 'Binance' },
+  { value: 'paypal', label: 'PayPal' },
   { value: 'otro', label: 'Otro' },
 ]
 
@@ -438,6 +439,9 @@ export default function AdminDashboard() {
     }
     if (guest.gift_type === 'binance') {
       return guest.gift_amount_usd != null ? { label: 'Binance', value: formatUsdt(guest.gift_amount_usd) } : null
+    }
+    if (guest.gift_type === 'paypal') {
+      return guest.gift_amount_usd != null ? { label: 'PayPal', value: formatUsd(guest.gift_amount_usd) } : null
     }
     return null
   }
