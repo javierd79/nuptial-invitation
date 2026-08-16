@@ -788,10 +788,10 @@ export default function AdminDashboard() {
               <table className="w-full min-w-[900px]">
                 <thead className="border-b border-ink/10 bg-ivory-deep/60">
                   <tr>
-                    <th className={`${labelClasses} px-6 py-3 text-left font-normal`}>Nombre</th>
-                    <th className={`${labelClasses} px-6 py-3 text-left font-normal`}>Correo</th>
-                    <th className={`${labelClasses} px-6 py-3 text-left font-normal`}>Acompañantes</th>
                     <th className={`${labelClasses} px-6 py-3 text-left font-normal`}>Estado</th>
+                    <th className={`${labelClasses} px-6 py-3 text-left font-normal`}>Nombre</th>
+                   <th className={`${labelClasses} px-6 py-3 text-left font-normal`}>Correo</th>
+                    <th className={`${labelClasses} px-6 py-3 text-left font-normal`}>Acompañantes</th>
                     <th className={`${labelClasses} px-6 py-3 text-left font-normal`}>Rol</th>
                     <th className={`${labelClasses} px-6 py-3 text-left font-normal`}>Regalo</th>
                     <th className={`${labelClasses} px-6 py-3 text-left font-normal`}>Registrado</th>
@@ -804,6 +804,20 @@ export default function AdminDashboard() {
                     const status = statusFor(guest)
                     return (
                       <tr key={guest.id} className="border-b border-ink/10 transition-colors hover:bg-ivory-deep/40">
+                        <td className="px-6 py-4">
+                          <span
+                            className={`inline-block rounded-full border px-3 py-1 font-serif text-[0.65rem] uppercase tracking-[0.2em] ${status.className}`}
+                          >
+                            {status.label}
+                          </span>
+                          <button
+                            type="button"
+                            onClick={() => updateCourtesyStatus(guest, !guest.is_courtesy)}
+                            className="mt-2 block font-serif text-[0.65rem] uppercase tracking-[0.2em] text-ink-faint underline decoration-ink/25 underline-offset-4 transition-colors hover:text-ink"
+                          >
+                            {guest.is_courtesy ? 'Quitar cortesía' : 'Marcar como cortesía'}
+                          </button>
+                        </td>
                         <td className="px-6 py-4">
                           <p className="font-serif text-base font-light text-ink">{guest.full_name}</p>
                           <p className="mt-0.5 font-serif text-xs italic text-ink-faint">{formatDate(guest.created_at)}</p>
@@ -857,20 +871,6 @@ export default function AdminDashboard() {
                               </div>
                             </div>
                           )}
-                        </td>
-                        <td className="px-6 py-4">
-                          <span
-                            className={`inline-block rounded-full border px-3 py-1 font-serif text-[0.65rem] uppercase tracking-[0.2em] ${status.className}`}
-                          >
-                            {status.label}
-                          </span>
-                          <button
-                            type="button"
-                            onClick={() => updateCourtesyStatus(guest, !guest.is_courtesy)}
-                            className="mt-2 block font-serif text-[0.65rem] uppercase tracking-[0.2em] text-ink-faint underline decoration-ink/25 underline-offset-4 transition-colors hover:text-ink"
-                          >
-                            {guest.is_courtesy ? 'Quitar cortesía' : 'Marcar como cortesía'}
-                          </button>
                         </td>
                         <td className="px-6 py-4">
                           {guest.is_godparent ? (
