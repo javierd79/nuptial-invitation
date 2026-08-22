@@ -3,6 +3,7 @@
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
+import { getUserWithRole, roleHome } from '@/lib/auth'
 
 export default function AdminLoginPage() {
   const [email, setEmail] = useState('')
@@ -19,7 +20,7 @@ export default function AdminLoginPage() {
     try {
       const supabase = createClient()
 
-      const { data, error: authError } = await supabase.auth.signInWithPassword({
+      const { error: authError } = await supabase.auth.signInWithPassword({
         email,
         password,
       })
@@ -30,9 +31,16 @@ export default function AdminLoginPage() {
         return
       }
 
-      if (data.session) {
-        router.push('/admin/dashboard')
+      const user = await getUserWithRole(supabase)
+
+      if (!user) {
+        await supabase.auth.signOut()
+        setError('Usuario sin rol asignado. Contacta al administrador.')
+        setLoading(false)
+        return
       }
+
+      router.push(roleHome(user.role))
     } catch (err: any) {
       setError(err.message || 'An error occurred')
       setLoading(false)

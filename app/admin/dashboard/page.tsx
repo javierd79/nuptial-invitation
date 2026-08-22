@@ -3,9 +3,13 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
-import { Check, Copy, Gift, LogOut, Pencil, Plus, RefreshCw, Search, Trash2 } from 'lucide-react'
+import { getUserWithRole, type AuthUser } from '@/lib/auth'
+import { Bell, BellRing, Check, Copy, Gift, LogOut, Pencil, Plus, RefreshCw, Search, Trash2 } from 'lucide-react'
 import { formatBs, formatUsd, formatUsdt, formatVzAmount, parseVzAmount } from '@/lib/format'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import { useGuestChangeNotifications } from '@/lib/use-guest-change-notifications'
+import ToastStack from '@/components/ToastStack'
+import ChatButton from '@/components/ChatButton'
 
 interface Guest {
   id: string
@@ -119,6 +123,12 @@ export default function AdminDashboard() {
   })
   const [editingGiftId, setEditingGiftId] = useState<string | null>(null)
   const [giftMessage, setGiftMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null)
+  const [user, setUser] = useState<AuthUser | null>(null)
+
+  const { toasts, dismissToast, permission, requestPermission } = useGuestChangeNotifications({
+    guests,
+    role: user?.role ?? null,
+  })
 
   const calculateMetrics = (list: Guest[]) => {
     const attending = list.filter((g) => g.is_attending === true)
@@ -185,6 +195,21 @@ export default function AdminDashboard() {
         router.push('/admin/login')
         return
       }
+
+      const user = await getUserWithRole(supabase)
+
+      if (!user) {
+        await supabase.auth.signOut()
+        router.push('/admin/login')
+        return
+      }
+
+      if (user.role !== 'ADMIN') {
+        router.push('/admin/protocol')
+        return
+      }
+
+      setUser(user)
 
       await Promise.all([loadGuests(), loadGifts()])
       if (!mounted) return
@@ -491,6 +516,7 @@ export default function AdminDashboard() {
 
   return (
     <div className="min-h-screen bg-ivory text-ink">
+      <ToastStack toasts={toasts} onDismiss={dismissToast} />
       {/* Header */}
       <header className="border-b border-ink/10">
         <div className="mx-auto flex max-w-7xl flex-wrap items-center justify-between gap-4 px-6 py-8">
@@ -503,6 +529,34 @@ export default function AdminDashboard() {
             </p>
           </div>
           <div className="flex items-center gap-3">
+            {user?.role && (
+              <span className="border border-brass/30 bg-brass/10 px-3 py-1.5 font-serif text-[0.65rem] uppercase tracking-[0.3em] text-brass">
+                {user.role}
+              </span>
+            )}
+            <ChatButton user={user} />
+            {permission !== 'unsupported' && (
+              <button
+                type="button"
+                onClick={requestPermission}
+                disabled={permission !== 'default'}
+                title={
+                  permission === 'granted'
+                    ? 'Notificaciones activadas'
+                    : permission === 'denied'
+                      ? 'Notificaciones bloqueadas en el navegador'
+                      : 'Activar notificaciones del navegador'
+                }
+                aria-label="Notificaciones"
+                className={`inline-flex h-9 w-9 items-center justify-center rounded-full border transition-colors ${
+                  permission === 'granted'
+                    ? 'border-brass bg-brass/10 text-brass'
+                    : 'border-ink/30 text-ink hover:bg-ink hover:text-ivory disabled:cursor-not-allowed disabled:opacity-40'
+                }`}
+              >
+                {permission === 'granted' ? <BellRing className="h-4 w-4" /> : <Bell className="h-4 w-4" />}
+              </button>
+            )}
             <span
               className={`inline-flex items-center gap-2 font-serif text-[0.65rem] uppercase tracking-[0.3em] ${
                 realtimeStatus === 'live' ? 'text-brass' : realtimeStatus === 'offline' ? 'text-red-700/70' : 'text-ink-faint'
