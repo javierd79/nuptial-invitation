@@ -233,3 +233,48 @@ ALTER PUBLICATION supabase_realtime ADD TABLE public.chat_message_status;
 -- -----------------------------------------------------------------------------
 ALTER TABLE public.guests
   ADD COLUMN IF NOT EXISTS phone TEXT;
+
+-- -----------------------------------------------------------------------------
+-- Venue / seating designer (admin panel). Run in the Supabase SQL editor.
+--
+-- seating_items: every block of the floor plan, one row per block.
+--   kind        'wall' | 'table_round' | 'table_rect' | 'chair'
+--               | 'dance_floor' | 'stage' | 'bar' | 'furniture'
+--   x, y        top-left corner in meters from the canvas origin.
+--   w, h        size in meters.
+--   rotation    degrees clockwise (0/45/90/...).
+--   label       free-form caption shown on the block.
+--   seats       table capacity (tables only); guest_ids holds assignments and
+--               a guest with plus_ones occupies 1 + plus_ones seats.
+-- ADMIN can edit; PROTOCOL reads the same rows live via Realtime.
+-- -----------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS public.seating_items (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  kind TEXT NOT NULL,
+  x NUMERIC NOT NULL DEFAULT 0,
+  y NUMERIC NOT NULL DEFAULT 0,
+  w NUMERIC NOT NULL DEFAULT 2,
+  h NUMERIC NOT NULL DEFAULT 2,
+  rotation INT NOT NULL DEFAULT 0,
+  label TEXT NOT NULL DEFAULT '',
+  seats INT,
+  guest_ids UUID[] NOT NULL DEFAULT '{}',
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS seating_items_kind_idx ON public.seating_items (kind);
+
+ALTER TABLE public.seating_items ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "Authenticated manage seating" ON public.seating_items
+  FOR ALL TO authenticated USING (true) WITH CHECK (true);
+
+DROP TRIGGER IF EXISTS update_seating_items_updated_at ON public.seating_items;
+
+CREATE TRIGGER update_seating_items_updated_at
+  BEFORE UPDATE ON public.seating_items
+  FOR EACH ROW
+  EXECUTE FUNCTION public.update_updated_at_column();
+
+ALTER PUBLICATION supabase_realtime ADD TABLE public.seating_items;

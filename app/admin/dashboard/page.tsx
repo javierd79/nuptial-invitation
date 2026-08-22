@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation'
 import { AnimatePresence, motion, MotionConfig } from 'motion/react'
 import { createClient } from '@/lib/supabase/client'
 import { getUserWithRole, type AuthUser } from '@/lib/auth'
-import { Bell, BellRing, Check, ChevronDown, Copy, LogOut, Pencil, Plus, RefreshCw, Search, Trash2, X } from 'lucide-react'
+import { Bell, BellRing, Check, ChevronDown, Copy, LogOut, Map, Pencil, Plus, RefreshCw, Search, Trash2, X } from 'lucide-react'
 import { formatBs, formatPhone, formatUsd, formatUsdt, formatVzAmount, parseVzAmount } from '@/lib/format'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Dialog, DialogTitle, SheetContent } from '@/components/ui/dialog'
@@ -644,6 +644,15 @@ export default function AdminDashboard() {
                 {user.role}
               </span>
             )}
+            <button
+              type="button"
+              onClick={() => router.push('/admin/seating')}
+              aria-label="Plano del salón"
+              title="Plano del salón"
+              className="inline-flex h-9 w-9 items-center justify-center rounded-full border border-ink/30 text-ink transition-colors hover:bg-ink hover:text-ivory"
+            >
+              <Map className="h-4 w-4" />
+            </button>
             <ChatButton user={user} />
             {permission !== 'unsupported' && (
               <button
