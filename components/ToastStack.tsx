@@ -1,6 +1,6 @@
 'use client'
 
-import { AnimatePresence, motion } from 'motion/react'
+import { AnimatePresence, motion, useReducedMotion } from 'motion/react'
 import { X } from 'lucide-react'
 import type { GuestChangeToast } from '@/lib/use-guest-change-notifications'
 
@@ -20,6 +20,16 @@ export default function ToastStack({
   toasts: GuestChangeToast[]
   onDismiss: (id: string) => void
 }) {
+  const reducedMotion = useReducedMotion()
+
+  const enterState = reducedMotion ? { opacity: 0 } : { opacity: 0, y: -16, scale: 0.97 }
+  const visibleState = { opacity: 1, y: 0, scale: 1 }
+  const exitState = reducedMotion ? { opacity: 0 } : { opacity: 0, y: -16, scale: 0.97 }
+
+  const transition = reducedMotion
+    ? { duration: 0.2, ease: 'easeOut' as const }
+    : { type: 'spring' as const, bounce: 0, duration: 0.3 }
+
   return (
     <div
       aria-live="polite"
@@ -30,10 +40,10 @@ export default function ToastStack({
           <motion.div
             key={toast.id}
             layout
-            initial={{ opacity: 0, y: -12, scale: 0.98 }}
-            animate={{ opacity: 1, y: 0, scale: 1 }}
-            exit={{ opacity: 0, y: -8, scale: 0.98 }}
-            transition={{ duration: 0.22, ease: 'easeOut' }}
+            initial={enterState}
+            animate={visibleState}
+            exit={exitState}
+            transition={transition}
             className="pointer-events-auto flex items-start gap-3 rounded-xl border border-ink/10 bg-ivory-deep px-4 py-3 shadow-lg shadow-ink/10"
           >
             <span className={`mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full ${KIND_DOT[toast.kind]}`} />

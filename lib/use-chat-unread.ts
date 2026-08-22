@@ -12,7 +12,7 @@ import {
 } from '@/lib/chat'
 import type { GuestChangeToast } from '@/lib/use-guest-change-notifications'
 
-const TOAST_MS = 6000
+const TOAST_MS = 3000
 
 export function useChatUnread({ user }: { user: AuthUser | null }) {
   const pathname = usePathname()

@@ -10,7 +10,7 @@ export interface GuestChangeToast {
   text: string
 }
 
-const TOAST_MS = 6000
+const TOAST_MS = 3000
 const MAX_TOASTS = 4
 
 export function useGuestChangeNotifications({
