@@ -2,12 +2,14 @@
 
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useRouter } from 'next/navigation'
+import { AnimatePresence, motion, MotionConfig } from 'motion/react'
 import { createClient } from '@/lib/supabase/client'
 import { getUserWithRole, type AuthUser } from '@/lib/auth'
 import { Bell, BellRing, Check, ChevronDown, Copy, LogOut, Pencil, Plus, RefreshCw, Search, Trash2, X } from 'lucide-react'
 import { formatBs, formatUsd, formatUsdt, formatVzAmount, parseVzAmount } from '@/lib/format'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
-import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog'
+import { Dialog, DialogTitle, SheetContent } from '@/components/ui/dialog'
+import { Collapse, SPRING_SOFT, Tappable } from '@/components/motion'
 import { useGuestChangeNotifications } from '@/lib/use-guest-change-notifications'
 import ToastStack from '@/components/ToastStack'
 import ChatButton from '@/components/ChatButton'
@@ -528,8 +530,9 @@ export default function AdminDashboard() {
     'fixed bottom-5 left-1/2 z-40 flex -translate-x-1/2 items-center gap-2 rounded-full border border-brass bg-brass px-6 py-3 font-serif text-xs uppercase tracking-[0.25em] text-ivory shadow-lg shadow-ink/15 transition-colors hover:bg-brass/90'
 
   return (
-    <div className="min-h-screen bg-ivory text-ink">
-      <ToastStack toasts={toasts} onDismiss={dismissToast} />
+    <MotionConfig reducedMotion="user">
+      <div className="min-h-screen bg-ivory text-ink">
+        <ToastStack toasts={toasts} onDismiss={dismissToast} />
 
       <header className="sticky top-0 z-10 border-b border-ink/10 bg-ivory/95 backdrop-blur">
         <div className="mx-auto flex w-full max-w-md items-center justify-between gap-3 px-4 py-4 md:max-w-2xl">
@@ -650,6 +653,11 @@ export default function AdminDashboard() {
               </TabsList>
 
               <TabsContent value="invitados" className="focus:outline-none pb-24">
+                <motion.div
+                  initial={{ opacity: 0, y: 6 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ duration: 0.18 }}
+                >
                 <section aria-label="Métricas de invitados">
                   <div className="grid grid-cols-3 gap-2">
                     <div className={`${counterClasses} border-brass/30 bg-brass/10`}>
@@ -700,51 +708,55 @@ export default function AdminDashboard() {
                     className="mt-2 flex w-full items-center justify-between rounded-xl border border-ink/10 bg-ivory-deep/40 px-4 py-3 font-serif text-[0.65rem] uppercase tracking-[0.25em] text-ink-faint transition-colors hover:text-ink"
                   >
                     Más métricas
-                    <ChevronDown className={`h-4 w-4 transition-transform ${metricsOpen ? 'rotate-180' : ''}`} />
+                    <motion.span
+                      animate={{ rotate: metricsOpen ? 180 : 0 }}
+                      transition={SPRING_SOFT}
+                      className="inline-flex"
+                    >
+                      <ChevronDown className="h-4 w-4" />
+                    </motion.span>
                   </button>
 
-                  {metricsOpen && (
-                    <>
-                      <div className="mt-2 grid grid-cols-3 gap-2 sm:grid-cols-6">
-                        <div className={counterClasses}>
-                          <p className="font-serif text-xl font-light tabular-nums">{metrics.courtesy}</p>
-                          <p className="mt-0.5 font-serif text-[0.55rem] uppercase tracking-[0.2em] text-ink-faint">
-                            Cortesía
-                          </p>
-                        </div>
-                        <div className={counterClasses}>
-                          <p className="font-serif text-xl font-light tabular-nums">{metrics.courtesy_attending}</p>
-                          <p className="mt-0.5 font-serif text-[0.55rem] uppercase tracking-[0.2em] text-ink-faint">
-                            Acomp. cortesía
-                          </p>
-                        </div>
-                        <div className={counterClasses}>
-                          <p className="font-serif text-xl font-light tabular-nums">{metrics.godparents}</p>
-                          <p className="mt-0.5 font-serif text-[0.55rem] uppercase tracking-[0.2em] text-ink-faint">
-                            Padrinos
-                          </p>
-                        </div>
-                        <div className={`${counterClasses} border-brass/30 bg-brass/5`}>
-                          <p className="font-serif text-xl font-light tabular-nums text-brass">{metrics.gift_count}</p>
-                          <p className="mt-0.5 font-serif text-[0.55rem] uppercase tracking-[0.2em] text-ink-faint">
-                            Regalos decl.
-                          </p>
-                        </div>
-                        <div className={`${counterClasses} border-brass/30 bg-brass/5`}>
-                          <p className="font-serif text-lg font-light tabular-nums text-brass">{formatUsd(metrics.sum_usd)}</p>
-                          <p className="mt-0.5 font-serif text-[0.55rem] uppercase tracking-[0.2em] text-ink-faint">
-                            Total USD
-                          </p>
-                        </div>
-                        <div className={`${counterClasses} border-brass/30 bg-brass/5`}>
-                          <p className="font-serif text-lg font-light tabular-nums text-brass">{formatBs(metrics.sum_bs)}</p>
-                          <p className="mt-0.5 font-serif text-[0.55rem] uppercase tracking-[0.2em] text-ink-faint">
-                            Total Bs.
-                          </p>
-                        </div>
+                  <Collapse open={metricsOpen}>
+                    <div className="mt-2 grid grid-cols-3 gap-2 sm:grid-cols-6">
+                      <div className={counterClasses}>
+                        <p className="font-serif text-xl font-light tabular-nums">{metrics.courtesy}</p>
+                        <p className="mt-0.5 font-serif text-[0.55rem] uppercase tracking-[0.2em] text-ink-faint">
+                          Cortesía
+                        </p>
                       </div>
-                    </>
-                  )}
+                      <div className={counterClasses}>
+                        <p className="font-serif text-xl font-light tabular-nums">{metrics.courtesy_attending}</p>
+                        <p className="mt-0.5 font-serif text-[0.55rem] uppercase tracking-[0.2em] text-ink-faint">
+                          Acomp. cortesía
+                        </p>
+                      </div>
+                      <div className={counterClasses}>
+                        <p className="font-serif text-xl font-light tabular-nums">{metrics.godparents}</p>
+                        <p className="mt-0.5 font-serif text-[0.55rem] uppercase tracking-[0.2em] text-ink-faint">
+                          Padrinos
+                        </p>
+                      </div>
+                      <div className={`${counterClasses} border-brass/30 bg-brass/5`}>
+                        <p className="font-serif text-xl font-light tabular-nums text-brass">{metrics.gift_count}</p>
+                        <p className="mt-0.5 font-serif text-[0.55rem] uppercase tracking-[0.2em] text-ink-faint">
+                          Regalos decl.
+                        </p>
+                      </div>
+                      <div className={`${counterClasses} border-brass/30 bg-brass/5`}>
+                        <p className="font-serif text-lg font-light tabular-nums text-brass">{formatUsd(metrics.sum_usd)}</p>
+                        <p className="mt-0.5 font-serif text-[0.55rem] uppercase tracking-[0.2em] text-ink-faint">
+                          Total USD
+                        </p>
+                      </div>
+                      <div className={`${counterClasses} border-brass/30 bg-brass/5`}>
+                        <p className="font-serif text-lg font-light tabular-nums text-brass">{formatBs(metrics.sum_bs)}</p>
+                        <p className="mt-0.5 font-serif text-[0.55rem] uppercase tracking-[0.2em] text-ink-faint">
+                          Total Bs.
+                        </p>
+                      </div>
+                    </div>
+                  </Collapse>
                 </section>
 
                 {guests.length === 0 ? (
@@ -762,11 +774,17 @@ export default function AdminDashboard() {
                       const gift = giftFor(guest)
                       const expanded = expandedGuestId === guest.id
                       return (
-                        <li key={guest.id} className={cardClasses}>
-                          <button
+                        <motion.li
+                          key={guest.id}
+                          layout
+                          transition={SPRING_SOFT}
+                          className={cardClasses}
+                        >
+                          <Tappable
                             type="button"
                             onClick={() => setExpandedGuestId(expanded ? null : guest.id)}
                             aria-expanded={expanded}
+                            whileTap={{ scale: 0.985 }}
                             className="flex w-full items-start justify-between gap-3 text-left"
                           >
                             <span className="min-w-0 flex-1">
@@ -788,13 +806,17 @@ export default function AdminDashboard() {
                               >
                                 {status.label}
                               </span>
-                              <ChevronDown
-                                className={`h-4 w-4 shrink-0 text-ink-faint transition-transform ${expanded ? 'rotate-180' : ''}`}
-                              />
+                              <motion.span
+                                animate={{ rotate: expanded ? 180 : 0 }}
+                                transition={SPRING_SOFT}
+                                className="inline-flex shrink-0 text-ink-faint"
+                              >
+                                <ChevronDown className="h-4 w-4" />
+                              </motion.span>
                             </span>
-                          </button>
+                          </Tappable>
 
-                          {expanded && (
+                          <Collapse open={expanded}>
                             <div className="mt-4 space-y-4 border-t border-ink/10 pt-4">
                               <div>
                                 <p className="break-all font-serif text-xs text-ink-soft">{guest.email}</p>
@@ -887,15 +909,21 @@ export default function AdminDashboard() {
                                 )}
                               </button>
                             </div>
-                          )}
-                        </li>
+                          </Collapse>
+                        </motion.li>
                       )
                     })}
                   </ul>
                 )}
+                </motion.div>
               </TabsContent>
 
               <TabsContent value="regalos" className="focus:outline-none pb-24">
+                <motion.div
+                  initial={{ opacity: 0, y: 6 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ duration: 0.18 }}
+                >
                 <section aria-label="Resumen de regalos recibidos">
                   <div className="grid grid-cols-3 gap-2">
                     <div className={`${counterClasses} border-brass/30 bg-brass/10`}>
@@ -926,7 +954,12 @@ export default function AdminDashboard() {
                 ) : (
                   <ul className="mt-5 grid grid-cols-1 gap-3 sm:grid-cols-2 sm:items-start">
                     {gifts.map((gift) => (
-                      <li key={gift.id} className={cardClasses}>
+                      <motion.li
+                        key={gift.id}
+                        layout
+                        transition={SPRING_SOFT}
+                        className={cardClasses}
+                      >
                         <div className="flex items-start justify-between gap-3">
                           <div className="min-w-0">
                             <p className="truncate font-serif text-lg font-light">
@@ -973,7 +1006,7 @@ export default function AdminDashboard() {
                             </button>
                           </span>
                         </div>
-                      </li>
+                      </motion.li>
                     ))}
                   </ul>
                 )}
@@ -1031,47 +1064,64 @@ export default function AdminDashboard() {
                     </ul>
                   </section>
                 )}
+                </motion.div>
               </TabsContent>
             </Tabs>
           </>
         )}
       </main>
 
-      {!loading && activeTab === 'invitados' && !addSheetOpen && (
-        <button
-          type="button"
-          onClick={() => {
-            setMessage(null)
-            setAddSheetOpen(true)
-          }}
-          className={fabClasses}
-        >
-          <Plus className="h-4 w-4" />
-          Invitado
-        </button>
-      )}
+      <AnimatePresence mode="popLayout">
+        {!loading && activeTab === 'invitados' && !addSheetOpen && (
+          <motion.button
+            key="fab-invitado"
+            type="button"
+            onClick={() => {
+              setMessage(null)
+              setAddSheetOpen(true)
+            }}
+            initial={{ opacity: 0, y: 24, scale: 0.9 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: 24, scale: 0.9 }}
+            transition={SPRING_SOFT}
+            whileTap={{ scale: 0.94 }}
+            className={fabClasses}
+          >
+            <Plus className="h-4 w-4" />
+            Invitado
+          </motion.button>
+        )}
 
-      {!loading && activeTab === 'regalos' && !giftSheetOpen && (
-        <button
-          type="button"
-          onClick={() => {
-            resetGiftForm()
-            setGiftSheetOpen(true)
-          }}
-          className={fabClasses}
-        >
-          <Plus className="h-4 w-4" />
-          Regalo
-        </button>
-      )}
+        {!loading && activeTab === 'regalos' && !giftSheetOpen && (
+          <motion.button
+            key="fab-regalo"
+            type="button"
+            onClick={() => {
+              resetGiftForm()
+              setGiftSheetOpen(true)
+            }}
+            initial={{ opacity: 0, y: 24, scale: 0.9 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: 24, scale: 0.9 }}
+            transition={SPRING_SOFT}
+            whileTap={{ scale: 0.94 }}
+            className={fabClasses}
+          >
+            <Plus className="h-4 w-4" />
+            Regalo
+          </motion.button>
+        )}
+      </AnimatePresence>
 
       <Dialog open={addSheetOpen} onOpenChange={setAddSheetOpen}>
-        <DialogContent className="top-auto bottom-0 flex max-h-[85dvh] translate-y-0 flex-col gap-3 rounded-b-none rounded-t-3xl bg-ivory p-5 pb-6 text-ink ring-ink/10 sm:max-w-md">
-          <div className="mx-auto h-1 w-10 shrink-0 rounded-full bg-ink/15" />
-          <DialogTitle className="font-serif text-xl font-light tracking-[-0.01em]">
+        <SheetContent
+          onCloseRequest={() => setAddSheetOpen(false)}
+          className="bg-ivory text-ink ring-ink/10"
+        >
+          <DialogTitle className="px-5 font-serif text-xl font-light tracking-[-0.01em]">
             Agregar invitado
           </DialogTitle>
-          <p className="font-serif text-xs italic text-ink-soft">
+          <p className="px-5 font-serif text-xs italic text-ink-soft">
             Se envía el enlace personalizado al invitado para su invitación.
           </p>
 
@@ -1192,23 +1242,25 @@ export default function AdminDashboard() {
               </div>
             )}
 
-            <button
+            <Tappable
               type="submit"
-              className="w-full rounded-full border border-ink bg-ink py-3 font-serif text-sm uppercase tracking-[0.25em] text-ivory transition-colors hover:bg-ink/90"
+              className="w-full rounded-full border border-ink bg-ink py-3 font-serif text-sm uppercase tracking-[0.25em] text-ivory"
             >
               Agregar invitado
-            </button>
+            </Tappable>
           </form>
-        </DialogContent>
+        </SheetContent>
       </Dialog>
 
       <Dialog open={giftSheetOpen} onOpenChange={setGiftSheetOpen}>
-        <DialogContent className="top-auto bottom-0 flex max-h-[85dvh] translate-y-0 flex-col gap-3 rounded-b-none rounded-t-3xl bg-ivory p-5 pb-6 text-ink ring-ink/10 sm:max-w-md">
-          <div className="mx-auto h-1 w-10 shrink-0 rounded-full bg-ink/15" />
-          <DialogTitle className="font-serif text-xl font-light tracking-[-0.01em]">
+        <SheetContent
+          onCloseRequest={() => setGiftSheetOpen(false)}
+          className="bg-ivory text-ink ring-ink/10"
+        >
+          <DialogTitle className="px-5 font-serif text-xl font-light tracking-[-0.01em]">
             {editingGiftId ? 'Editar regalo recibido' : 'Registrar regalo recibido'}
           </DialogTitle>
-          <p className="font-serif text-xs italic text-ink-soft">
+          <p className="px-5 font-serif text-xs italic text-ink-soft">
             Registra aquí los regalos recibidos el día de la boda.
           </p>
 
@@ -1307,13 +1359,13 @@ export default function AdminDashboard() {
             )}
 
             <div className="flex gap-3">
-              <button
+              <Tappable
                 type="submit"
-                className="flex-1 rounded-full border border-ink bg-ink py-3 font-serif text-sm uppercase tracking-[0.25em] text-ivory transition-colors hover:bg-ink/90"
+                className="flex-1 rounded-full border border-ink bg-ink py-3 font-serif text-sm uppercase tracking-[0.25em] text-ivory"
               >
                 {editingGiftId ? 'Guardar cambios' : 'Registrar regalo'}
-              </button>
-              <button
+              </Tappable>
+              <Tappable
                 type="button"
                 onClick={() => {
                   resetGiftForm()
@@ -1322,11 +1374,12 @@ export default function AdminDashboard() {
                 className="rounded-full border border-ink/30 px-6 py-3 font-serif text-sm uppercase tracking-[0.25em] text-ink transition-colors hover:bg-ink hover:text-ivory"
               >
                 Cancelar
-              </button>
+              </Tappable>
             </div>
           </form>
-        </DialogContent>
+        </SheetContent>
       </Dialog>
     </div>
+    </MotionConfig>
   )
 }

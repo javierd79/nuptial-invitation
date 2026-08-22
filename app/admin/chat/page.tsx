@@ -2,9 +2,11 @@
 
 import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
+import { AnimatePresence, motion, MotionConfig } from 'motion/react'
 import { ArrowLeft, Check, CheckCheck, LayoutDashboard, LogOut, Send, Users } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import { getUserWithRole, roleHome, type AuthUser } from '@/lib/auth'
+import { Collapse, SPRING_SOFT, Tappable } from '@/components/motion'
 import {
   GROUP_ROOM_ID,
   displayName,
@@ -19,6 +21,23 @@ import {
 } from '@/lib/chat'
 import { seenBy, tickFor, useChatThread } from '@/lib/use-chat-thread'
 import { useChatUnread } from '@/lib/use-chat-unread'
+
+const EASE_IOS: [number, number, number, number] = [0.32, 0.72, 0, 1]
+
+const viewVariants = {
+  enter: (direction: number) => ({
+    x: direction >= 0 ? '100%' : '-24%',
+    opacity: direction >= 0 ? 1 : 0,
+  }),
+  center: {
+    x: 0,
+    opacity: 1,
+  },
+  exit: (direction: number) => ({
+    x: direction >= 0 ? '-24%' : '100%',
+    opacity: direction >= 0 ? 0 : 1,
+  }),
+}
 
 function previewTime(iso: string): string {
   const date = new Date(iso)
@@ -39,6 +58,7 @@ export default function ChatPage() {
   const [previews, setPreviews] = useState<Record<string, ChatMessage>>({})
   const [draft, setDraft] = useState('')
   const [seenFor, setSeenFor] = useState<string | null>(null)
+  const [navDirection, setNavDirection] = useState(1)
 
   const scrollRef = useRef<HTMLDivElement>(null)
   const bottomRef = useRef<HTMLDivElement>(null)
@@ -163,7 +183,7 @@ export default function ChatPage() {
   }, [activeRoom, loadPreviews, refresh])
 
   useEffect(() => {
-    bottomRef.current?.scrollIntoView({ block: 'end' })
+    bottomRef.current?.scrollIntoView({ block: 'end', behavior: 'smooth' })
   }, [thread.messages.length, activeRoom])
 
   useEffect(() => {
@@ -238,8 +258,14 @@ export default function ChatPage() {
   }, [thread.messages, user])
 
   const openRoom = (roomId: string) => {
+    setNavDirection(1)
     setActiveRoom(roomId)
     setSeenFor(null)
+  }
+
+  const closeRoom = () => {
+    setNavDirection(-1)
+    setActiveRoom(null)
   }
 
   if (loading || !user) {
@@ -254,6 +280,7 @@ export default function ChatPage() {
   }
 
   return (
+    <MotionConfig reducedMotion="user">
     <div className="flex h-[100dvh] flex-col bg-ivory text-ink">
       <header className="border-b border-ink/10 bg-ivory/95 backdrop-blur">
         <div className="mx-auto flex w-full max-w-md items-center gap-3 px-4 py-3">
@@ -261,7 +288,7 @@ export default function ChatPage() {
             <>
               <button
                 type="button"
-                onClick={() => setActiveRoom(null)}
+                onClick={closeRoom}
                 aria-label="Volver a conversaciones"
                 className="-ml-1 inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-ink transition-colors hover:bg-ink/5"
               >
@@ -310,8 +337,19 @@ export default function ChatPage() {
         </div>
       </header>
 
-      {!activeRoom ? (
-        <main className="flex-1 overflow-y-auto pb-6">
+      <div className="relative flex-1 overflow-hidden">
+        <AnimatePresence initial={false} custom={navDirection}>
+          {!activeRoom ? (
+            <motion.main
+              key="room-list"
+              custom={navDirection}
+              variants={viewVariants}
+              initial="enter"
+              animate="center"
+              exit="exit"
+              transition={{ duration: 0.32, ease: EASE_IOS }}
+              className="absolute inset-0 overflow-y-auto pb-6"
+            >
           <ul>
             <li>
               <button
@@ -338,9 +376,15 @@ export default function ChatPage() {
                         : 'Canal para todo el equipo'}
                     </span>
                     {(byRoom[GROUP_ROOM_ID] ?? 0) > 0 && (
-                      <span className="shrink-0 rounded-full bg-red-700 px-1.5 py-0.5 font-serif text-[0.55rem] leading-none text-ivory">
+                      <motion.span
+                        key={byRoom[GROUP_ROOM_ID]}
+                        initial={{ scale: 0.5, opacity: 0 }}
+                        animate={{ scale: 1, opacity: 1 }}
+                        transition={SPRING_SOFT}
+                        className="shrink-0 rounded-full bg-red-700 px-1.5 py-0.5 font-serif text-[0.55rem] leading-none text-ivory"
+                      >
                         {byRoom[GROUP_ROOM_ID]}
-                      </span>
+                      </motion.span>
                     )}
                   </span>
                 </span>
@@ -374,9 +418,15 @@ export default function ChatPage() {
                           {last?.body ?? 'Sin mensajes aún'}
                         </span>
                         {(byRoom[roomId] ?? 0) > 0 && (
-                          <span className="shrink-0 rounded-full bg-red-700 px-1.5 py-0.5 font-serif text-[0.55rem] leading-none text-ivory">
+                          <motion.span
+                            key={byRoom[roomId]}
+                            initial={{ scale: 0.5, opacity: 0 }}
+                            animate={{ scale: 1, opacity: 1 }}
+                            transition={SPRING_SOFT}
+                            className="shrink-0 rounded-full bg-red-700 px-1.5 py-0.5 font-serif text-[0.55rem] leading-none text-ivory"
+                          >
                             {byRoom[roomId]}
-                          </span>
+                          </motion.span>
                         )}
                       </span>
                     </span>
@@ -391,9 +441,18 @@ export default function ChatPage() {
               Aún no hay más miembros del equipo. Cuando otro usuario entre al chat aparecerá aquí.
             </p>
           )}
-        </main>
-      ) : (
-        <>
+            </motion.main>
+          ) : (
+            <motion.div
+              key={activeRoom}
+              custom={navDirection}
+              variants={viewVariants}
+              initial="enter"
+              animate="center"
+              exit="exit"
+              transition={{ duration: 0.32, ease: EASE_IOS }}
+              className="absolute inset-0 flex flex-col"
+            >
           <main ref={scrollRef} className="flex-1 overflow-y-auto px-4 py-4">
             {thread.loading && thread.messages.length === 0 ? (
               <p className="py-12 text-center font-serif text-sm italic text-ink-soft">
@@ -443,19 +502,23 @@ export default function ChatPage() {
                 className="min-w-0 flex-1 rounded-full border border-ink/20 bg-transparent px-4 py-2.5 font-serif text-base font-light placeholder:text-ink/25 focus:border-brass focus:outline-none"
                 autoComplete="off"
               />
-              <button
+              <Tappable
                 type="submit"
                 disabled={!draft.trim() || thread.sending}
                 aria-label="Enviar mensaje"
-                className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-full border border-brass bg-brass text-ivory transition-colors hover:bg-brass/90 disabled:pointer-events-none disabled:opacity-40"
+                whileTap={{ scale: 0.88 }}
+                className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-full border border-brass bg-brass text-ivory disabled:pointer-events-none disabled:opacity-40"
               >
                 <Send className="h-4 w-4" />
-              </button>
+              </Tappable>
             </div>
           </form>
-        </>
-      )}
+            </motion.div>
+          )}
+        </AnimatePresence>
+      </div>
     </div>
+    </MotionConfig>
   )
 }
 
@@ -484,7 +547,12 @@ function MessageRow({
   const tick = mine ? tickFor(message, meId, participants) : 'sent'
 
   return (
-    <div className={`mb-2 flex flex-col ${mine ? 'items-end' : 'items-start'}`}>
+    <motion.div
+      initial={{ opacity: 0, y: 8, scale: 0.97 }}
+      animate={{ opacity: 1, y: 0, scale: 1 }}
+      transition={SPRING_SOFT}
+      className={`mb-2 flex flex-col ${mine ? 'items-end' : 'items-start'}`}
+    >
       {showSender && (
         <p className="mb-0.5 ml-1 font-serif text-[0.65rem] uppercase tracking-[0.15em] text-ink-faint">
           {senderLabel}
@@ -525,15 +593,15 @@ function MessageRow({
           >
             Visto por {readers.length}
           </button>
-          {expanded && (
+          <Collapse open={expanded}>
             <p className="pt-1 font-serif text-[0.7rem] font-light text-ink-soft">
               {readers
                 .map((r) => `${displayName(profileById.get(r.user_id))} · ${timeLabel(r.read_at!)}`)
                 .join(', ')}
             </p>
-          )}
+          </Collapse>
         </div>
       )}
-    </div>
+    </motion.div>
   )
 }

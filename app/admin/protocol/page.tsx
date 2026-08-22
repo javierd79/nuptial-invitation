@@ -2,11 +2,13 @@
 
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useRouter } from 'next/navigation'
+import { AnimatePresence, motion, MotionConfig } from 'motion/react'
 import { createClient } from '@/lib/supabase/client'
 import { getUserWithRole, type AuthUser } from '@/lib/auth'
 import { Bell, BellRing, Check, ChevronUp, LogOut, Minus, Plus, Search, Users, X } from 'lucide-react'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
-import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog'
+import { Dialog, DialogTitle, SheetContent } from '@/components/ui/dialog'
+import { SPRING_SOFT, Tappable } from '@/components/motion'
 import { useGuestChangeNotifications } from '@/lib/use-guest-change-notifications'
 import ToastStack from '@/components/ToastStack'
 import ChatButton from '@/components/ChatButton'
@@ -354,6 +356,7 @@ export default function ProtocolPage() {
     'h-auto w-full py-3 font-serif text-xs uppercase tracking-[0.3em] text-ink-faint data-active:text-ink data-active:after:bg-brass hover:text-yellow-400'
 
   return (
+    <MotionConfig reducedMotion="user">
     <div className="min-h-screen bg-ivory text-ink">
       <ToastStack toasts={toasts} onDismiss={dismissToast} />
       <header className="sticky top-0 z-10 border-b border-ink/10 bg-ivory/95 backdrop-blur">
@@ -497,7 +500,12 @@ export default function ProtocolPage() {
                     {filteredGuests.map((guest) => {
                       const status = statusFor(guest)
                       return (
-                        <li key={guest.id} className={cardClasses}>
+                        <motion.li
+                          key={guest.id}
+                          layout
+                          transition={SPRING_SOFT}
+                          className={cardClasses}
+                        >
                           <div className="flex items-start justify-between gap-3">
                             <div className="min-w-0">
                               <p className="truncate font-serif text-lg font-light">{guest.full_name}</p>
@@ -515,30 +523,34 @@ export default function ProtocolPage() {
                           </div>
 
                           <div className="mt-4 grid grid-cols-2 gap-2">
-                            <button
+                            <Tappable
                               type="button"
                               onClick={() => setAttendance(guest, true)}
-                              className={`rounded-full border py-3 font-serif text-xs uppercase tracking-[0.2em] transition-colors ${
+                              aria-pressed={guest.is_attending === true}
+                              whileTap={{ scale: 0.96 }}
+                              className={`rounded-full border py-3 font-serif text-xs uppercase tracking-[0.2em] ${
                                 guest.is_attending === true
                                   ? 'border-brass bg-brass text-ivory'
                                   : 'border-brass/40 text-brass hover:bg-brass/10'
                               }`}
                             >
                               Confirmar
-                            </button>
-                            <button
+                            </Tappable>
+                            <Tappable
                               type="button"
                               onClick={() => setAttendance(guest, false)}
-                              className={`rounded-full border py-3 font-serif text-xs uppercase tracking-[0.2em] transition-colors ${
+                              aria-pressed={guest.is_attending === false}
+                              whileTap={{ scale: 0.96 }}
+                              className={`rounded-full border py-3 font-serif text-xs uppercase tracking-[0.2em] ${
                                 guest.is_attending === false
                                   ? 'border-red-700 bg-red-700 text-ivory'
                                   : 'border-red-700/40 text-red-700/80 hover:bg-red-700/10'
                               }`}
                             >
                               Rechazar
-                            </button>
+                            </Tappable>
                           </div>
-                        </li>
+                        </motion.li>
                       )
                     })}
                   </ul>
@@ -595,7 +607,12 @@ export default function ProtocolPage() {
                 ) : (
                   <ul className="space-y-3">
                     {checkinGuests.map((guest) => (
-                      <li key={guest.id} className={cardClasses}>
+                      <motion.li
+                        key={guest.id}
+                        layout
+                        transition={SPRING_SOFT}
+                        className={cardClasses}
+                      >
                         <div className="flex items-start justify-between gap-3">
                           <div className="min-w-0">
                             <p className="truncate font-serif text-lg font-light">{guest.full_name}</p>
@@ -613,20 +630,21 @@ export default function ProtocolPage() {
                         </div>
 
                         {!guest.checked_in_at ? (
-                          <button
+                          <Tappable
                             type="button"
                             onClick={() => markArrival(guest)}
-                            className="mt-4 w-full rounded-full border border-brass bg-brass py-3 font-serif text-xs uppercase tracking-[0.25em] text-ivory transition-colors hover:bg-brass/90"
+                            whileTap={{ scale: 0.97 }}
+                            className="mt-4 w-full rounded-full border border-brass bg-brass py-3 font-serif text-xs uppercase tracking-[0.25em] text-ivory"
                           >
                             Marcar llegada
-                          </button>
+                          </Tappable>
                         ) : (
                           <div className="mt-4 flex items-center justify-center gap-1.5 rounded-full border border-brass/30 bg-brass/10 px-4 py-2 font-serif text-xs text-brass">
                             <Check className="h-3.5 w-3.5 shrink-0" />
                             {formatArrival(guest.checked_in_at)}
                           </div>
                         )}
-                      </li>
+                      </motion.li>
                     ))}
                   </ul>
                 )}
@@ -636,22 +654,29 @@ export default function ProtocolPage() {
         )}
       </main>
 
-      {activeTab === 'checkin' && !loading && !sheetOpen && arrivedGuests.length > 0 && (
-        <button
-          type="button"
-          onClick={() => setSheetOpen(true)}
-          className="fixed bottom-5 left-1/2 z-40 flex -translate-x-1/2 items-center gap-2 rounded-full border border-brass bg-brass px-6 py-3 font-serif text-xs uppercase tracking-[0.25em] text-ivory shadow-lg shadow-ink/15 transition-colors hover:bg-brass/90"
-        >
-          <Users className="h-4 w-4" />
-          {arrivedGuests.length} {arrivedGuests.length === 1 ? 'llegado' : 'llegados'}
-          <ChevronUp className="h-4 w-4" />
-        </button>
-      )}
+      <AnimatePresence>
+        {activeTab === 'checkin' && !loading && !sheetOpen && arrivedGuests.length > 0 && (
+          <motion.button
+            key="fab-llegados"
+            type="button"
+            onClick={() => setSheetOpen(true)}
+            initial={{ opacity: 0, y: 24, scale: 0.9 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: 24, scale: 0.9 }}
+            transition={SPRING_SOFT}
+            whileTap={{ scale: 0.95 }}
+            className="fixed bottom-5 left-1/2 z-40 flex -translate-x-1/2 items-center gap-2 rounded-full border border-brass bg-brass px-6 py-3 font-serif text-xs uppercase tracking-[0.25em] text-ivory shadow-lg shadow-ink/15"
+          >
+            <Users className="h-4 w-4" />
+            {arrivedGuests.length} {arrivedGuests.length === 1 ? 'llegado' : 'llegados'}
+            <ChevronUp className="h-4 w-4" />
+          </motion.button>
+        )}
+      </AnimatePresence>
 
       <Dialog open={sheetOpen} onOpenChange={setSheetOpen}>
-        <DialogContent className="top-auto bottom-0 flex max-h-[85dvh] translate-y-0 flex-col gap-3 rounded-b-none rounded-t-3xl bg-ivory p-5 pb-6 text-ink ring-ink/10 sm:max-w-md">
-          <div className="mx-auto h-1 w-10 shrink-0 rounded-full bg-ink/15" />
-          <DialogTitle className="font-serif text-xl font-light tracking-[-0.01em]">
+        <SheetContent onCloseRequest={() => setSheetOpen(false)} className="bg-ivory text-ink ring-ink/10">
+          <DialogTitle className="px-5 font-serif text-xl font-light tracking-[-0.01em]">
             Llegados ({arrivedGuests.length})
           </DialogTitle>
 
@@ -663,7 +688,12 @@ export default function ProtocolPage() {
             ) : (
               <ul className="space-y-3">
                 {arrivedGuests.map((guest) => (
-                  <li key={guest.id} className={cardClasses}>
+                  <motion.li
+                    key={guest.id}
+                    layout
+                    transition={SPRING_SOFT}
+                    className={cardClasses}
+                  >
                     <div className="flex items-start justify-between gap-3">
                       <div className="min-w-0">
                         <p className="truncate font-serif text-lg font-light">{guest.full_name}</p>
@@ -703,19 +733,20 @@ export default function ProtocolPage() {
                           {ARRIVAL_MODES.map((mode) => {
                             const activeMode = guest.arrival_mode === mode.value
                             return (
-                              <button
+                              <Tappable
                                 key={mode.value}
                                 type="button"
                                 onClick={() => setArrivalMode(guest, mode.value)}
                                 aria-pressed={activeMode}
-                                className={`rounded-full border px-2 py-2.5 font-serif text-[0.6rem] uppercase tracking-[0.12em] transition-colors ${
+                                whileTap={{ scale: 0.95 }}
+                                className={`rounded-full border px-2 py-2.5 font-serif text-[0.6rem] uppercase tracking-[0.12em] ${
                                   activeMode
                                     ? 'border-brass bg-brass text-ivory'
                                     : 'border-ink/20 text-ink-faint hover:border-ink/40'
                                 }`}
                               >
                                 {mode.label}
-                              </button>
+                              </Tappable>
                             )
                           })}
                         </div>
@@ -726,7 +757,7 @@ export default function ProtocolPage() {
                               Acompañantes llegados
                             </span>
                             <span className="flex items-center gap-2">
-                              <button
+                              <Tappable
                                 type="button"
                                 onClick={() => adjustCompanionsArrived(guest, -1)}
                                 disabled={(guest.companions_arrived ?? 0) <= 1}
@@ -734,12 +765,12 @@ export default function ProtocolPage() {
                                 className="inline-flex h-7 w-7 items-center justify-center rounded-full border border-ink/20 text-ink transition-colors hover:bg-ink hover:text-ivory disabled:pointer-events-none disabled:opacity-30"
                               >
                                 <Minus className="h-3.5 w-3.5" />
-                              </button>
+                              </Tappable>
                               <span className="min-w-14 text-center font-serif text-sm">
                                 {guest.companions_arrived ?? 0}
                                 <span className="text-xs text-ink/40"> / {guest.plus_ones}</span>
                               </span>
-                              <button
+                              <Tappable
                                 type="button"
                                 onClick={() => adjustCompanionsArrived(guest, 1)}
                                 disabled={(guest.companions_arrived ?? 0) >= guest.plus_ones}
@@ -747,7 +778,7 @@ export default function ProtocolPage() {
                                 className="inline-flex h-7 w-7 items-center justify-center rounded-full border border-ink/20 text-ink transition-colors hover:bg-ink hover:text-ivory disabled:pointer-events-none disabled:opacity-30"
                               >
                                 <Plus className="h-3.5 w-3.5" />
-                              </button>
+                              </Tappable>
                             </span>
                           </div>
                         )}
@@ -755,30 +786,32 @@ export default function ProtocolPage() {
                     )}
 
                     <div className="mt-3 flex gap-2">
-                      <button
+                      <Tappable
                         type="button"
                         onClick={() => togglePart(guest, 'attended_ceremony')}
                         aria-pressed={guest.attended_ceremony}
-                        className={`flex-1 rounded-full border py-2.5 font-serif text-[0.65rem] uppercase tracking-[0.2em] transition-colors ${
+                        whileTap={{ scale: 0.95 }}
+                        className={`flex-1 rounded-full border py-2.5 font-serif text-[0.65rem] uppercase tracking-[0.2em] ${
                           guest.attended_ceremony
                             ? 'border-brass bg-brass/10 text-brass'
                             : 'border-ink/20 text-ink-faint hover:border-ink/40'
                         }`}
                       >
                         Ceremonia
-                      </button>
-                      <button
+                      </Tappable>
+                      <Tappable
                         type="button"
                         onClick={() => togglePart(guest, 'attended_brindis')}
                         aria-pressed={guest.attended_brindis}
-                        className={`flex-1 rounded-full border py-2.5 font-serif text-[0.65rem] uppercase tracking-[0.2em] transition-colors ${
+                        whileTap={{ scale: 0.95 }}
+                        className={`flex-1 rounded-full border py-2.5 font-serif text-[0.65rem] uppercase tracking-[0.2em] ${
                           guest.attended_brindis
                             ? 'border-brass bg-brass/10 text-brass'
                             : 'border-ink/20 text-ink-faint hover:border-ink/40'
                         }`}
                       >
                         Brindis
-                      </button>
+                      </Tappable>
                     </div>
 
                     <textarea
@@ -791,28 +824,41 @@ export default function ProtocolPage() {
                       className="mt-4 w-full resize-none border-b border-ink/20 bg-transparent pb-2 font-serif text-sm font-light placeholder:text-ink/25 focus:border-brass focus:outline-none"
                     />
 
-                    {noteDirtyFor(guest) && (
-                      <button
-                        type="button"
-                        onClick={() => saveNotes(guest)}
-                        className="mt-2 w-full rounded-full border border-ink py-2.5 font-serif text-[0.65rem] uppercase tracking-[0.25em] text-ink transition-colors hover:bg-ink hover:text-ivory"
-                      >
-                        Guardar nota
-                      </button>
-                    )}
+                    <AnimatePresence initial={false}>
+                      {noteDirtyFor(guest) && (
+                        <motion.div
+                          key="save-note"
+                          initial={{ opacity: 0, height: 0 }}
+                          animate={{ opacity: 1, height: 'auto' }}
+                          exit={{ opacity: 0, height: 0 }}
+                          transition={SPRING_SOFT}
+                          className="overflow-hidden"
+                        >
+                          <Tappable
+                            type="button"
+                            onClick={() => saveNotes(guest)}
+                            whileTap={{ scale: 0.97 }}
+                            className="mt-2 w-full rounded-full border border-ink py-2.5 font-serif text-[0.65rem] uppercase tracking-[0.25em] text-ink"
+                          >
+                            Guardar nota
+                          </Tappable>
+                        </motion.div>
+                      )}
+                    </AnimatePresence>
 
                     {savedNoteId === guest.id && (
                       <p className="mt-2 text-center font-serif text-xs italic text-brass">
                         Nota guardada
                       </p>
                     )}
-                  </li>
+                  </motion.li>
                 ))}
               </ul>
             )}
           </div>
-        </DialogContent>
+        </SheetContent>
       </Dialog>
     </div>
+    </MotionConfig>
   )
 }

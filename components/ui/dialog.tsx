@@ -1,10 +1,12 @@
 "use client"
 
 import * as React from "react"
+import { animate, motion, useDragControls, useMotionValue } from "motion/react"
 import { Dialog as DialogPrimitive } from "@base-ui/react/dialog"
 
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
+import { SPRING_SOFT } from "@/components/motion"
 import { XIcon } from "lucide-react"
 
 function Dialog({ ...props }: DialogPrimitive.Root.Props) {
@@ -72,6 +74,85 @@ function DialogContent({
           >
             <XIcon
             />
+            <span className="sr-only">Close</span>
+          </DialogPrimitive.Close>
+        )}
+      </DialogPrimitive.Popup>
+    </DialogPortal>
+  )
+}
+
+function SheetContent({
+  className,
+  children,
+  showCloseButton = true,
+  onCloseRequest,
+  ...props
+}: DialogPrimitive.Popup.Props & {
+  showCloseButton?: boolean
+  onCloseRequest?: () => void
+}) {
+  const dragControls = useDragControls()
+  const dragY = useMotionValue(0)
+
+  const closeSheet = (velocity: number) => {
+    const remaining =
+      typeof window === "undefined" ? 800 : Math.max(window.innerHeight - dragY.get(), 240)
+    void animate(dragY, dragY.get() + remaining, {
+      type: "spring",
+      bounce: 0,
+      duration: 0.3,
+      velocity,
+    }).then(() => {
+      onCloseRequest?.()
+    })
+  }
+
+  return (
+    <DialogPortal>
+      <DialogOverlay />
+      <DialogPrimitive.Popup
+        data-slot="sheet-content"
+        className={cn(
+          "fixed inset-x-0 bottom-0 z-50 mx-auto flex max-h-[92dvh] w-full max-w-md flex-col overflow-hidden rounded-t-3xl bg-popover text-sm text-popover-foreground ring-1 ring-foreground/10 outline-none sm:max-w-md",
+          className
+        )}
+        {...props}
+      >
+        <motion.div
+          drag="y"
+          dragListener={false}
+          dragControls={dragControls}
+          dragConstraints={{ top: 0 }}
+          dragElastic={{ top: 0.04 }}
+          dragMomentum={false}
+          style={{ y: dragY }}
+          onDragEnd={(_, info) => {
+            if (info.offset.y > 110 || info.velocity.y > 650) {
+              closeSheet(info.velocity.y)
+            } else {
+              void animate(dragY, 0, SPRING_SOFT)
+            }
+          }}
+          className="flex min-h-0 flex-1 flex-col"
+        >
+          <div
+            aria-hidden="true"
+            onPointerDown={(event) => dragControls.start(event)}
+            className="-mx-2 shrink-0 cursor-grab touch-none px-2 pb-2 pt-3 active:cursor-grabbing"
+          >
+            <div className="mx-auto h-1 w-10 rounded-full bg-ink/15" />
+          </div>
+          {children}
+        </motion.div>
+        {showCloseButton && (
+          <DialogPrimitive.Close
+            data-slot="dialog-close"
+            render={
+              <Button variant="ghost" className="absolute top-3 right-3" size="icon-sm" />
+            }
+          >
+            <XIcon />
             <span className="sr-only">Close</span>
           </DialogPrimitive.Close>
         )}
@@ -157,4 +238,5 @@ export {
   DialogPortal,
   DialogTitle,
   DialogTrigger,
+  SheetContent,
 }
