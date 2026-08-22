@@ -4,9 +4,10 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { getUserWithRole, type AuthUser } from '@/lib/auth'
-import { Bell, BellRing, Check, Copy, Gift, LogOut, Pencil, Plus, RefreshCw, Search, Trash2 } from 'lucide-react'
+import { Bell, BellRing, Check, ChevronDown, Copy, LogOut, Pencil, Plus, RefreshCw, Search, Trash2, X } from 'lucide-react'
 import { formatBs, formatUsd, formatUsdt, formatVzAmount, parseVzAmount } from '@/lib/format'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog'
 import { useGuestChangeNotifications } from '@/lib/use-guest-change-notifications'
 import ToastStack from '@/components/ToastStack'
 import ChatButton from '@/components/ChatButton'
@@ -124,6 +125,11 @@ export default function AdminDashboard() {
   const [editingGiftId, setEditingGiftId] = useState<string | null>(null)
   const [giftMessage, setGiftMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null)
   const [user, setUser] = useState<AuthUser | null>(null)
+  const [activeTab, setActiveTab] = useState('invitados')
+  const [metricsOpen, setMetricsOpen] = useState(false)
+  const [expandedGuestId, setExpandedGuestId] = useState<string | null>(null)
+  const [addSheetOpen, setAddSheetOpen] = useState(false)
+  const [giftSheetOpen, setGiftSheetOpen] = useState(false)
 
   const { toasts, dismissToast, permission, requestPermission } = useGuestChangeNotifications({
     guests,
@@ -196,20 +202,21 @@ export default function AdminDashboard() {
         return
       }
 
-      const user = await getUserWithRole(supabase)
+      const authUser = await getUserWithRole(supabase)
 
-      if (!user) {
+      if (!authUser) {
         await supabase.auth.signOut()
         router.push('/admin/login')
         return
       }
 
-      if (user.role !== 'ADMIN') {
+      if (authUser.role !== 'ADMIN') {
         router.push('/admin/protocol')
         return
       }
 
-      setUser(user)
+      if (!mounted) return
+      setUser(authUser)
 
       await Promise.all([loadGuests(), loadGifts()])
       if (!mounted) return
@@ -282,7 +289,7 @@ export default function AdminDashboard() {
       if (error) {
         setMessage({ type: 'error', text: `No se pudo agregar: ${error.message}` })
       } else {
-        setMessage({ type: 'success', text: 'Invitado agregado correctamente.' })
+        setMessage(null)
         setFormData({
           full_name: '',
           email: '',
@@ -293,6 +300,7 @@ export default function AdminDashboard() {
           courtesy_plus_ones: '0',
           gender: '',
         })
+        setAddSheetOpen(false)
         loadGuests()
       }
     } catch (error) {
@@ -312,6 +320,7 @@ export default function AdminDashboard() {
       received_at: '',
     })
     setEditingGiftId(null)
+    setGiftMessage(null)
   }
 
   const handleSaveGift = async (e: React.FormEvent) => {
@@ -341,11 +350,8 @@ export default function AdminDashboard() {
       if (error) {
         setGiftMessage({ type: 'error', text: `No se pudo guardar: ${error.message}` })
       } else {
-        setGiftMessage({
-          type: 'success',
-          text: editingGiftId ? 'Regalo actualizado correctamente.' : 'Regalo registrado correctamente.',
-        })
         resetGiftForm()
+        setGiftSheetOpen(false)
         loadGifts()
       }
     } catch (error) {
@@ -366,6 +372,7 @@ export default function AdminDashboard() {
       received_at: gift.received_at ?? '',
     })
     setGiftMessage(null)
+    setGiftSheetOpen(true)
   }
 
   const handleDeleteGift = async (id: string) => {
@@ -511,26 +518,47 @@ export default function AdminDashboard() {
     'mt-2 w-full border-b border-ink/20 bg-transparent pb-2 font-serif text-lg font-light text-ink placeholder:text-ink/25 focus:border-brass focus:outline-none'
   const selectClasses =
     'mt-2 w-full border-b border-ink/20 bg-transparent pb-2 font-serif text-lg font-light text-ink focus:border-brass focus:outline-none'
-  const labelClasses = 'font-serif text-[0.65rem] uppercase tracking-[0.3em] text-ink-faint'
-  const panelClasses = 'rounded-2xl border border-ink/10 bg-ivory-deep/40'
+  const labelClasses = 'font-serif text-[0.6rem] uppercase tracking-[0.25em] text-ink-faint'
+  const cardClasses = 'rounded-2xl border border-ink/10 bg-ivory-deep/40 p-4'
+  const counterClasses =
+    'rounded-xl border border-ink/10 bg-ivory-deep/40 px-3 py-2.5 text-center'
+  const tabTriggerClasses =
+    'h-auto w-full py-3 font-serif text-xs uppercase tracking-[0.3em] text-ink-faint data-active:text-ink data-active:after:bg-brass hover:text-yellow-400'
+  const fabClasses =
+    'fixed bottom-5 left-1/2 z-40 flex -translate-x-1/2 items-center gap-2 rounded-full border border-brass bg-brass px-6 py-3 font-serif text-xs uppercase tracking-[0.25em] text-ivory shadow-lg shadow-ink/15 transition-colors hover:bg-brass/90'
 
   return (
     <div className="min-h-screen bg-ivory text-ink">
       <ToastStack toasts={toasts} onDismiss={dismissToast} />
-      {/* Header */}
-      <header className="border-b border-ink/10">
-        <div className="mx-auto flex max-w-7xl flex-wrap items-center justify-between gap-4 px-6 py-8">
-          <div>
-            <h1 className="font-serif text-3xl font-light tracking-[-0.01em] text-ink md:text-4xl">
-              Panel de invitados
-            </h1>
-            <p className="mt-2 font-serif text-xs uppercase tracking-[0.3em] text-ink-faint">
-              Javier &amp; Maria · 12 de septiembre de 2026
+
+      <header className="sticky top-0 z-10 border-b border-ink/10 bg-ivory/95 backdrop-blur">
+        <div className="mx-auto flex w-full max-w-md items-center justify-between gap-3 px-4 py-4 md:max-w-2xl">
+          <div className="min-w-0">
+            <h1 className="font-serif text-2xl font-light tracking-[-0.01em]">Panel</h1>
+            <p className="mt-1 truncate font-serif text-[0.6rem] uppercase tracking-[0.3em] text-ink-faint">
+              Javier &amp; Maria · 12 sep 2026
             </p>
           </div>
-          <div className="flex items-center gap-3">
+          <div className="flex shrink-0 items-center gap-2">
+            <span
+              aria-label="Estado de conexión"
+              title={
+                realtimeStatus === 'live'
+                  ? 'En vivo'
+                  : realtimeStatus === 'offline'
+                    ? 'Sin conexión'
+                    : 'Conectando'
+              }
+              className={`h-1.5 w-1.5 shrink-0 rounded-full ${
+                realtimeStatus === 'live'
+                  ? 'bg-brass'
+                  : realtimeStatus === 'offline'
+                    ? 'bg-red-700/70'
+                    : 'bg-ink-faint animate-pulse'
+              }`}
+            />
             {user?.role && (
-              <span className="border border-brass/30 bg-brass/10 px-3 py-1.5 font-serif text-[0.65rem] uppercase tracking-[0.3em] text-brass">
+              <span className="shrink-0 border border-brass/30 bg-brass/10 px-2.5 py-1 font-serif text-[0.6rem] uppercase tracking-[0.25em] text-brass">
                 {user.role}
               </span>
             )}
@@ -548,7 +576,7 @@ export default function AdminDashboard() {
                       : 'Activar notificaciones del navegador'
                 }
                 aria-label="Notificaciones"
-                className={`inline-flex h-9 w-9 items-center justify-center rounded-full border transition-colors ${
+                className={`inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full border transition-colors ${
                   permission === 'granted'
                     ? 'border-brass bg-brass/10 text-brass'
                     : 'border-ink/30 text-ink hover:bg-ink hover:text-ivory disabled:cursor-not-allowed disabled:opacity-40'
@@ -557,125 +585,497 @@ export default function AdminDashboard() {
                 {permission === 'granted' ? <BellRing className="h-4 w-4" /> : <Bell className="h-4 w-4" />}
               </button>
             )}
-            <span
-              className={`inline-flex items-center gap-2 font-serif text-[0.65rem] uppercase tracking-[0.3em] ${
-                realtimeStatus === 'live' ? 'text-brass' : realtimeStatus === 'offline' ? 'text-red-700/70' : 'text-ink-faint'
-              }`}
-            >
-              <span
-                className={`h-1.5 w-1.5 rounded-full ${
-                  realtimeStatus === 'live' ? 'bg-brass' : realtimeStatus === 'offline' ? 'bg-red-700/70' : 'bg-ink-faint animate-pulse'
-                }`}
-              />
-              {realtimeStatus === 'live' ? 'En vivo' : realtimeStatus === 'offline' ? 'Sin conexión' : 'Conectando'}
-            </span>
             <button
               type="button"
               onClick={loadGuests}
               aria-label="Refrescar invitados"
-              className="inline-flex items-center gap-2 border border-ink/30 px-4 py-2.5 font-serif text-xs uppercase tracking-[0.25em] text-ink transition-colors hover:bg-ink hover:text-ivory"
+              className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-ink/30 text-ink transition-colors hover:bg-ink hover:text-ivory"
             >
-              <RefreshCw className="h-3.5 w-3.5" />
-              Refrescar
+              <RefreshCw className="h-4 w-4" />
             </button>
             <button
               type="button"
               onClick={handleLogout}
-              className="inline-flex items-center gap-2 border border-ink/30 px-4 py-2.5 font-serif text-xs uppercase tracking-[0.25em] text-ink transition-colors hover:bg-ink hover:text-ivory"
+              aria-label="Cerrar sesión"
+              className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-ink/30 text-ink transition-colors hover:bg-ink hover:text-ivory"
             >
-              <LogOut className="h-3.5 w-3.5" />
-              Salir
+              <LogOut className="h-4 w-4" />
             </button>
           </div>
         </div>
       </header>
 
-      <main className="mx-auto max-w-7xl px-6 py-12">
-        <Tabs defaultValue="invitados">
-          <TabsList variant="line" className="mb-10 h-auto w-fit border-b border-ink/10">
-            <TabsTrigger
-              value="invitados"
-              className="h-auto px-8 py-3 font-serif text-xs uppercase tracking-[0.3em] text-ink-faint data-active:text-ink data-active:after:bg-brass hover:text-yellow-400 hover:cursor-pointer"
-            >
-              Invitados
-            </TabsTrigger>
-            <TabsTrigger
-              value="regalos"
-              className="h-auto px-8 py-3 font-serif text-xs uppercase tracking-[0.3em] text-ink-faint data-active:text-ink data-active:after:bg-brass hover:text-yellow-400 hover:cursor-pointer"
-            >
-              Regalos recibidos
-            </TabsTrigger>
-          </TabsList>
-
-          <TabsContent value="invitados" className="focus:outline-none">
-        {/* Metrics */}
-        <section aria-label="Métricas de invitados">
-          <div className="grid grid-cols-2 gap-4 lg:grid-cols-6">
-            <div className="rounded-2xl border border-ink/10 bg-ivory-deep/60 p-6">
-              <p className={labelClasses}>Invitados</p>
-              <p className="mt-2 font-serif text-3xl font-light tabular-nums text-ink">{metrics.total_guests}</p>
-            </div>
-            <div className="rounded-2xl border border-ink/10 bg-ivory-deep/60 p-6">
-              <p className={labelClasses}>Acompañantes</p>
-              <p className="mt-2 font-serif text-3xl font-light tabular-nums text-ink">{metrics.total_plus_ones}</p>
-            </div>
-            <div className="rounded-2xl border border-ink/10 bg-ivory-deep/60 p-6">
-              <p className={labelClasses}>Asistentes estimados</p>
-              <p className="mt-2 font-serif text-3xl font-light tabular-nums text-ink">{metrics.estimated_attendees}</p>
-            </div>
-            <div className="rounded-2xl border border-ink/10 bg-ivory-deep/60 p-6">
-              <p className={labelClasses}>Confirmados</p>
-              <p className="mt-2 font-serif text-3xl font-light tabular-nums text-brass">{metrics.confirmed}</p>
-            </div>
-            <div className="rounded-2xl border border-ink/10 bg-ivory-deep/60 p-6">
-              <p className={labelClasses}>Rechazó</p>
-              <p className="mt-2 font-serif text-3xl font-light tabular-nums text-red-700/70">{metrics.declined}</p>
-            </div>
-            <div className="rounded-2xl border border-ink/10 bg-ivory-deep/60 p-6">
-              <p className={labelClasses}>Pendientes</p>
-              <p className="mt-2 font-serif text-3xl font-light tabular-nums text-ink-soft">{metrics.pending}</p>
+      <main className="mx-auto w-full max-w-md px-4 py-6 md:max-w-2xl">
+        {loading ? (
+          <div className="flex min-h-[50vh] items-center justify-center">
+            <div className="text-center">
+              <div className="mx-auto mb-4 h-12 w-px animate-pulse bg-ink/20" />
+              <p className="font-serif text-sm italic text-ink-soft">Cargando panel…</p>
             </div>
           </div>
+        ) : (
+          <>
+            <label className="block">
+              <span className="sr-only">Buscar invitado</span>
+              <div className="relative">
+                <Search className="pointer-events-none absolute left-0 top-1/2 h-4 w-4 -translate-y-1/2 text-ink/30" />
+                <input
+                  type="search"
+                  value={search}
+                  onChange={(e) => setSearch(e.target.value)}
+                  placeholder="Buscar por nombre o correo…"
+                  className="w-full border-b border-ink/20 bg-transparent py-2 pl-7 pr-8 font-serif text-base font-light placeholder:text-ink/25 focus:border-brass focus:outline-none"
+                />
+                {search && (
+                  <button
+                    type="button"
+                    onClick={() => setSearch('')}
+                    aria-label="Limpiar búsqueda"
+                    className="absolute right-0 top-1/2 -translate-y-1/2 p-1 text-ink/40 transition-colors hover:text-ink"
+                  >
+                    <X className="h-4 w-4" />
+                  </button>
+                )}
+              </div>
+            </label>
 
-          <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-3">
-            <div className="rounded-2xl border border-ink/10 bg-ivory-deep/40 p-6">
-              <p className={labelClasses}>Invitaciones de cortesía</p>
-              <p className="mt-2 font-serif text-3xl font-light tabular-nums text-ink">{metrics.courtesy}</p>
-            </div>
-            <div className="rounded-2xl border border-ink/10 bg-ivory-deep/40 p-6">
-              <p className={labelClasses}>Acompañantes de cortesía que asisten</p>
-              <p className="mt-2 font-serif text-3xl font-light tabular-nums text-ink">{metrics.courtesy_attending}</p>
-            </div>
-            <div className="rounded-2xl border border-ink/10 bg-ivory-deep/40 p-6">
-              <p className={labelClasses}>Padrinos</p>
-              <p className="mt-2 font-serif text-3xl font-light tabular-nums text-ink">{metrics.godparents}</p>
-            </div>
-          </div>
+            <Tabs value={activeTab} onValueChange={(value) => setActiveTab(String(value))} className="mt-6">
+              <TabsList variant="line" className="mb-5 grid h-auto w-full grid-cols-2 border-b border-ink/10">
+                <TabsTrigger value="invitados" className={tabTriggerClasses}>
+                  Invitados
+                </TabsTrigger>
+                <TabsTrigger value="regalos" className={tabTriggerClasses}>
+                  Regalos
+                </TabsTrigger>
+              </TabsList>
 
-          <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-3">
-            <div className="rounded-2xl border border-brass/30 bg-brass/5 p-6">
-              <p className={labelClasses}>Regalos registrados</p>
-              <p className="mt-2 font-serif text-3xl font-light tabular-nums text-brass">{metrics.gift_count}</p>
-            </div>
-            <div className="rounded-2xl border border-brass/30 bg-brass/5 p-6">
-              <p className={labelClasses}>Total en USD</p>
-              <p className="mt-2 font-serif text-3xl font-light tabular-nums text-brass">{formatUsd(metrics.sum_usd)}</p>
-            </div>
-            <div className="rounded-2xl border border-brass/30 bg-brass/5 p-6">
-              <p className={labelClasses}>Total en Bs.</p>
-              <p className="mt-2 font-serif text-3xl font-light tabular-nums text-brass">{formatBs(metrics.sum_bs)}</p>
-            </div>
-          </div>
-        </section>
+              <TabsContent value="invitados" className="focus:outline-none pb-24">
+                <section aria-label="Métricas de invitados">
+                  <div className="grid grid-cols-3 gap-2">
+                    <div className={`${counterClasses} border-brass/30 bg-brass/10`}>
+                      <p className="font-serif text-2xl font-light tabular-nums text-brass">{metrics.confirmed}</p>
+                      <p className="mt-0.5 font-serif text-[0.55rem] uppercase tracking-[0.2em] text-ink-faint">
+                        Confirmados
+                      </p>
+                    </div>
+                    <div className={counterClasses}>
+                      <p className="font-serif text-2xl font-light tabular-nums">{metrics.pending}</p>
+                      <p className="mt-0.5 font-serif text-[0.55rem] uppercase tracking-[0.2em] text-ink-faint">
+                        Pendientes
+                      </p>
+                    </div>
+                    <div className={counterClasses}>
+                      <p className="font-serif text-2xl font-light tabular-nums text-red-700/70">{metrics.declined}</p>
+                      <p className="mt-0.5 font-serif text-[0.55rem] uppercase tracking-[0.2em] text-ink-faint">
+                        Rechazó
+                      </p>
+                    </div>
+                  </div>
 
-        {/* Add guest */}
-        <section className={`${panelClasses} mb-12 mt-12 p-8`}>
-          <h2 className="font-serif text-2xl font-light text-ink">Agregar invitado</h2>
-          <p className="mt-2 font-serif text-sm italic text-ink-soft">
+                  <div className="mt-2 grid grid-cols-3 gap-2">
+                    <div className={counterClasses}>
+                      <p className="font-serif text-xl font-light tabular-nums">{metrics.total_guests}</p>
+                      <p className="mt-0.5 font-serif text-[0.55rem] uppercase tracking-[0.2em] text-ink-faint">
+                        Invitados
+                      </p>
+                    </div>
+                    <div className={counterClasses}>
+                      <p className="font-serif text-xl font-light tabular-nums">{metrics.total_plus_ones}</p>
+                      <p className="mt-0.5 font-serif text-[0.55rem] uppercase tracking-[0.2em] text-ink-faint">
+                        Acompañantes
+                      </p>
+                    </div>
+                    <div className={counterClasses}>
+                      <p className="font-serif text-xl font-light tabular-nums">{metrics.estimated_attendees}</p>
+                      <p className="mt-0.5 font-serif text-[0.55rem] uppercase tracking-[0.2em] text-ink-faint">
+                        Asistentes est.
+                      </p>
+                    </div>
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={() => setMetricsOpen((current) => !current)}
+                    aria-expanded={metricsOpen}
+                    className="mt-2 flex w-full items-center justify-between rounded-xl border border-ink/10 bg-ivory-deep/40 px-4 py-3 font-serif text-[0.65rem] uppercase tracking-[0.25em] text-ink-faint transition-colors hover:text-ink"
+                  >
+                    Más métricas
+                    <ChevronDown className={`h-4 w-4 transition-transform ${metricsOpen ? 'rotate-180' : ''}`} />
+                  </button>
+
+                  {metricsOpen && (
+                    <>
+                      <div className="mt-2 grid grid-cols-3 gap-2 sm:grid-cols-6">
+                        <div className={counterClasses}>
+                          <p className="font-serif text-xl font-light tabular-nums">{metrics.courtesy}</p>
+                          <p className="mt-0.5 font-serif text-[0.55rem] uppercase tracking-[0.2em] text-ink-faint">
+                            Cortesía
+                          </p>
+                        </div>
+                        <div className={counterClasses}>
+                          <p className="font-serif text-xl font-light tabular-nums">{metrics.courtesy_attending}</p>
+                          <p className="mt-0.5 font-serif text-[0.55rem] uppercase tracking-[0.2em] text-ink-faint">
+                            Acomp. cortesía
+                          </p>
+                        </div>
+                        <div className={counterClasses}>
+                          <p className="font-serif text-xl font-light tabular-nums">{metrics.godparents}</p>
+                          <p className="mt-0.5 font-serif text-[0.55rem] uppercase tracking-[0.2em] text-ink-faint">
+                            Padrinos
+                          </p>
+                        </div>
+                        <div className={`${counterClasses} border-brass/30 bg-brass/5`}>
+                          <p className="font-serif text-xl font-light tabular-nums text-brass">{metrics.gift_count}</p>
+                          <p className="mt-0.5 font-serif text-[0.55rem] uppercase tracking-[0.2em] text-ink-faint">
+                            Regalos decl.
+                          </p>
+                        </div>
+                        <div className={`${counterClasses} border-brass/30 bg-brass/5`}>
+                          <p className="font-serif text-lg font-light tabular-nums text-brass">{formatUsd(metrics.sum_usd)}</p>
+                          <p className="mt-0.5 font-serif text-[0.55rem] uppercase tracking-[0.2em] text-ink-faint">
+                            Total USD
+                          </p>
+                        </div>
+                        <div className={`${counterClasses} border-brass/30 bg-brass/5`}>
+                          <p className="font-serif text-lg font-light tabular-nums text-brass">{formatBs(metrics.sum_bs)}</p>
+                          <p className="mt-0.5 font-serif text-[0.55rem] uppercase tracking-[0.2em] text-ink-faint">
+                            Total Bs.
+                          </p>
+                        </div>
+                      </div>
+                    </>
+                  )}
+                </section>
+
+                {guests.length === 0 ? (
+                  <p className="py-12 text-center font-serif text-sm italic text-ink-soft">
+                    Aún no hay invitados.
+                  </p>
+                ) : filteredGuests.length === 0 ? (
+                  <p className="py-12 text-center font-serif text-sm italic text-ink-soft">
+                    Ningún invitado coincide con la búsqueda.
+                  </p>
+                ) : (
+                  <ul className="mt-5 grid grid-cols-1 gap-3 sm:grid-cols-2 sm:items-start">
+                    {filteredGuests.map((guest) => {
+                      const status = statusFor(guest)
+                      const gift = giftFor(guest)
+                      const expanded = expandedGuestId === guest.id
+                      return (
+                        <li key={guest.id} className={cardClasses}>
+                          <button
+                            type="button"
+                            onClick={() => setExpandedGuestId(expanded ? null : guest.id)}
+                            aria-expanded={expanded}
+                            className="flex w-full items-start justify-between gap-3 text-left"
+                          >
+                            <span className="min-w-0 flex-1">
+                              <span className="block truncate font-serif text-lg font-light">{guest.full_name}</span>
+                              <span className="mt-0.5 block font-serif text-xs text-ink-soft">
+                                {guest.plus_ones > 0
+                                  ? `+${guest.plus_ones} acompañante${guest.plus_ones > 1 ? 's' : ''}`
+                                  : 'Sin acompañantes'}
+                              </span>
+                              {guest.is_godparent && (
+                                <span className="mt-1 inline-block rounded-full border border-brass/40 px-2.5 py-0.5 font-serif text-[0.55rem] uppercase tracking-[0.2em] text-brass">
+                                  {guest.gender === 'female' ? 'Madrina' : 'Padrino'}
+                                </span>
+                              )}
+                            </span>
+                            <span className="flex shrink-0 items-center gap-1.5 pt-0.5">
+                              <span
+                                className={`rounded-full border px-3 py-1 font-serif text-[0.6rem] uppercase tracking-[0.2em] ${status.className}`}
+                              >
+                                {status.label}
+                              </span>
+                              <ChevronDown
+                                className={`h-4 w-4 shrink-0 text-ink-faint transition-transform ${expanded ? 'rotate-180' : ''}`}
+                              />
+                            </span>
+                          </button>
+
+                          {expanded && (
+                            <div className="mt-4 space-y-4 border-t border-ink/10 pt-4">
+                              <div>
+                                <p className="break-all font-serif text-xs text-ink-soft">{guest.email}</p>
+                                <p className="mt-0.5 font-serif text-[0.65rem] italic text-ink-faint">
+                                  Registrado · {formatDate(guest.created_at)}
+                                </p>
+                              </div>
+
+                              <div className="flex flex-wrap items-center gap-2">
+                                {(['female', 'male'] as const).map((value) => (
+                                  <button
+                                    key={value}
+                                    type="button"
+                                    onClick={() => updateGender(guest, value)}
+                                    className={`rounded-full border px-3.5 py-1.5 font-serif text-[0.6rem] uppercase tracking-[0.15em] transition-colors ${
+                                      guest.gender === value
+                                        ? 'border-ink bg-ink text-ivory'
+                                        : 'border-ink/20 text-ink-faint hover:border-ink/50 hover:text-ink'
+                                    }`}
+                                  >
+                                    {value === 'female' ? 'Mujer' : 'Hombre'}
+                                  </button>
+                                ))}
+                                <button
+                                  type="button"
+                                  onClick={() => updateCourtesyStatus(guest, !guest.is_courtesy)}
+                                  className="rounded-full border border-ink/20 px-3.5 py-1.5 font-serif text-[0.6rem] uppercase tracking-[0.15em] text-ink-soft transition-colors hover:border-ink/50 hover:text-ink"
+                                >
+                                  {guest.is_courtesy ? 'Quitar cortesía' : 'Marcar cortesía'}
+                                </button>
+                              </div>
+
+                              {guest.is_courtesy && (
+                                <div className="flex items-center justify-between rounded-full border border-ink/15 px-3 py-1.5">
+                                  <span className="font-serif text-xs text-ink-soft">Acompañantes que asisten</span>
+                                  <span className="flex items-center gap-2">
+                                    <button
+                                      type="button"
+                                      aria-label="Quitar un acompañante que asiste"
+                                      onClick={() => updateCourtesyPlusOnes(guest, guest.courtesy_plus_ones - 1)}
+                                      disabled={guest.courtesy_plus_ones <= 0}
+                                      className="inline-flex h-7 w-7 items-center justify-center rounded-full border border-ink/20 font-serif text-sm text-ink transition-colors hover:bg-ink hover:text-ivory disabled:cursor-not-allowed disabled:opacity-30"
+                                    >
+                                      −
+                                    </button>
+                                    <span className="min-w-14 text-center font-serif text-sm tabular-nums">
+                                      {guest.courtesy_plus_ones}
+                                      <span className="text-xs text-ink/40"> / {guest.plus_ones}</span>
+                                    </span>
+                                    <button
+                                      type="button"
+                                      aria-label="Agregar un acompañante que asiste"
+                                      onClick={() => updateCourtesyPlusOnes(guest, guest.courtesy_plus_ones + 1)}
+                                      disabled={guest.courtesy_plus_ones >= guest.plus_ones}
+                                      className="inline-flex h-7 w-7 items-center justify-center rounded-full border border-ink/20 font-serif text-sm text-ink transition-colors hover:bg-ink hover:text-ivory disabled:cursor-not-allowed disabled:opacity-30"
+                                    >
+                                      +
+                                    </button>
+                                  </span>
+                                </div>
+                              )}
+
+                              <div>
+                                <p className={labelClasses}>Regalo declarado</p>
+                                {gift ? (
+                                  <p className="mt-1 font-serif text-sm text-ink">
+                                    <span className="text-ink-faint">{gift.label}: </span>
+                                    {gift.value}
+                                  </p>
+                                ) : (
+                                  <p className="mt-1 font-serif text-sm italic text-ink-faint">Sin regalo declarado</p>
+                                )}
+                              </div>
+
+                              <button
+                                type="button"
+                                onClick={() => copyToClipboard(guest.id)}
+                                className="w-full rounded-full border border-ink/20 py-2.5 font-serif text-[0.65rem] uppercase tracking-[0.25em] text-ink transition-colors hover:bg-ink hover:text-ivory"
+                              >
+                                {copiedId === guest.id ? (
+                                  <span className="inline-flex items-center justify-center gap-2">
+                                    <Check className="h-3.5 w-3.5" />
+                                    Enlace copiado
+                                  </span>
+                                ) : (
+                                  <span className="inline-flex items-center justify-center gap-2">
+                                    <Copy className="h-3.5 w-3.5" />
+                                    Copiar invitación
+                                  </span>
+                                )}
+                              </button>
+                            </div>
+                          )}
+                        </li>
+                      )
+                    })}
+                  </ul>
+                )}
+              </TabsContent>
+
+              <TabsContent value="regalos" className="focus:outline-none pb-24">
+                <section aria-label="Resumen de regalos recibidos">
+                  <div className="grid grid-cols-3 gap-2">
+                    <div className={`${counterClasses} border-brass/30 bg-brass/10`}>
+                      <p className="font-serif text-2xl font-light tabular-nums text-brass">{giftTotals.count}</p>
+                      <p className="mt-0.5 font-serif text-[0.55rem] uppercase tracking-[0.2em] text-ink-faint">
+                        Recibidos
+                      </p>
+                    </div>
+                    <div className={counterClasses}>
+                      <p className="font-serif text-lg font-light tabular-nums">{formatUsd(giftTotals.sum_usd)}</p>
+                      <p className="mt-0.5 font-serif text-[0.55rem] uppercase tracking-[0.2em] text-ink-faint">
+                        Total USD
+                      </p>
+                    </div>
+                    <div className={counterClasses}>
+                      <p className="font-serif text-lg font-light tabular-nums">{formatBs(giftTotals.sum_bs)}</p>
+                      <p className="mt-0.5 font-serif text-[0.55rem] uppercase tracking-[0.2em] text-ink-faint">
+                        Total Bs.
+                      </p>
+                    </div>
+                  </div>
+                </section>
+
+                {gifts.length === 0 ? (
+                  <p className="py-12 text-center font-serif text-sm italic text-ink-soft">
+                    Aún no hay regalos registrados.
+                  </p>
+                ) : (
+                  <ul className="mt-5 grid grid-cols-1 gap-3 sm:grid-cols-2 sm:items-start">
+                    {gifts.map((gift) => (
+                      <li key={gift.id} className={cardClasses}>
+                        <div className="flex items-start justify-between gap-3">
+                          <div className="min-w-0">
+                            <p className="truncate font-serif text-lg font-light">
+                              {gift.guest?.full_name ?? 'Sin vincular'}
+                            </p>
+                            {gift.notes && (
+                              <p className="mt-0.5 font-serif text-xs italic text-ink-faint">{gift.notes}</p>
+                            )}
+                          </div>
+                          <span className="shrink-0 rounded-full border border-brass/40 bg-brass/5 px-3 py-1 font-serif text-[0.6rem] uppercase tracking-[0.2em] text-brass">
+                            {giftTypeLabel(gift.gift_type)}
+                          </span>
+                        </div>
+
+                        {gift.description && (
+                          <p className="mt-2 font-serif text-sm font-light text-ink-soft">{gift.description}</p>
+                        )}
+
+                        <div className="mt-3 flex items-center justify-between gap-2 rounded-full border border-ink/10 px-4 py-2 font-serif text-sm tabular-nums">
+                          <span>{gift.amount_usd != null ? formatUsd(gift.amount_usd) : '—'}</span>
+                          <span className="text-ink-soft">{gift.amount_bs != null ? formatBs(gift.amount_bs) : '—'}</span>
+                        </div>
+
+                        <div className="mt-3 flex items-center justify-between">
+                          <span className="font-serif text-[0.65rem] italic text-ink-faint">
+                            {formatReceivedDate(gift.received_at)}
+                          </span>
+                          <span className="flex gap-2">
+                            <button
+                              type="button"
+                              onClick={() => handleEditGift(gift)}
+                              aria-label="Editar regalo"
+                              className="inline-flex h-8 w-8 items-center justify-center rounded-full border border-ink/20 text-ink-soft transition-colors hover:border-ink/50 hover:text-ink"
+                            >
+                              <Pencil className="h-3.5 w-3.5" />
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => handleDeleteGift(gift.id)}
+                              aria-label="Eliminar regalo"
+                              className="inline-flex h-8 w-8 items-center justify-center rounded-full border border-red-700/25 text-red-700/70 transition-colors hover:border-red-700/60 hover:text-red-700"
+                            >
+                              <Trash2 className="h-3.5 w-3.5" />
+                            </button>
+                          </span>
+                        </div>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+
+                {declaredWithoutRecord.length > 0 && (
+                  <section className="mt-8" aria-label="Declarados sin registrar">
+                    <h2 className="font-serif text-xl font-light text-ink">Declarados sin registrar</h2>
+                    <p className="mt-1 font-serif text-xs italic text-ink-soft">
+                      Declararon un regalo en su invitación pero aún no aparece en el registro recibido.
+                    </p>
+                    <ul className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2 sm:items-start">
+                      {declaredWithoutRecord.map((guest) => {
+                        const declared = giftFor(guest)
+                        return (
+                          <li key={guest.id} className={cardClasses}>
+                            <div className="flex items-start justify-between gap-3">
+                              <div className="min-w-0">
+                                <p className="truncate font-serif text-base font-light">{guest.full_name}</p>
+                                {declared && (
+                                  <p className="mt-0.5 truncate font-serif text-xs italic text-ink-faint">
+                                    {declared.label}: {declared.value}
+                                  </p>
+                                )}
+                              </div>
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setEditingGiftId(null)
+                                  setGiftForm((prev) => ({
+                                    ...prev,
+                                    guest_id: guest.id,
+                                    gift_type: guest.gift_type ?? 'fisico',
+                                    description:
+                                      guest.gift_type === 'fisico' ? (guest.gift_description ?? '') : '',
+                                    amount_usd:
+                                      guest.gift_amount_usd != null
+                                        ? formatVzAmount(String(guest.gift_amount_usd))
+                                        : '',
+                                    amount_bs:
+                                      guest.gift_amount_bs != null
+                                        ? formatVzAmount(String(guest.gift_amount_bs))
+                                        : '',
+                                  }))
+                                  setGiftMessage(null)
+                                  setGiftSheetOpen(true)
+                                }}
+                                className="shrink-0 rounded-full border border-ink/30 px-4 py-2 font-serif text-[0.6rem] uppercase tracking-[0.2em] text-ink transition-colors hover:bg-ink hover:text-ivory"
+                              >
+                                Registrar
+                              </button>
+                            </div>
+                          </li>
+                        )
+                      })}
+                    </ul>
+                  </section>
+                )}
+              </TabsContent>
+            </Tabs>
+          </>
+        )}
+      </main>
+
+      {!loading && activeTab === 'invitados' && !addSheetOpen && (
+        <button
+          type="button"
+          onClick={() => {
+            setMessage(null)
+            setAddSheetOpen(true)
+          }}
+          className={fabClasses}
+        >
+          <Plus className="h-4 w-4" />
+          Invitado
+        </button>
+      )}
+
+      {!loading && activeTab === 'regalos' && !giftSheetOpen && (
+        <button
+          type="button"
+          onClick={() => {
+            resetGiftForm()
+            setGiftSheetOpen(true)
+          }}
+          className={fabClasses}
+        >
+          <Plus className="h-4 w-4" />
+          Regalo
+        </button>
+      )}
+
+      <Dialog open={addSheetOpen} onOpenChange={setAddSheetOpen}>
+        <DialogContent className="top-auto bottom-0 flex max-h-[85dvh] translate-y-0 flex-col gap-3 rounded-b-none rounded-t-3xl bg-ivory p-5 pb-6 text-ink ring-ink/10 sm:max-w-md">
+          <div className="mx-auto h-1 w-10 shrink-0 rounded-full bg-ink/15" />
+          <DialogTitle className="font-serif text-xl font-light tracking-[-0.01em]">
+            Agregar invitado
+          </DialogTitle>
+          <p className="font-serif text-xs italic text-ink-soft">
             Se envía el enlace personalizado al invitado para su invitación.
           </p>
 
-          <form onSubmit={handleAddGuest} className="mt-8 grid grid-cols-1 gap-8 md:grid-cols-2">
+          <form onSubmit={handleAddGuest} className="-mx-1 flex flex-col gap-5 overflow-y-auto px-1 pb-1">
             <label className="block">
               <span className={labelClasses}>Nombre completo *</span>
               <input
@@ -712,27 +1112,18 @@ export default function AdminDashboard() {
                 className={inputClasses}
               />
             </label>
-            <label className="flex items-center gap-3 pt-4">
-              <input
-                type="checkbox"
-                checked={formData.is_godparent}
-                onChange={(e) => setFormData({ ...formData, is_godparent: e.target.checked })}
-                className="h-4 w-4 border-ink/30 accent-brass"
-              />
-              <span className="font-serif text-sm uppercase tracking-[0.25em] text-ink">Es padrino/madrina</span>
-            </label>
-            <div className="flex flex-col justify-center pt-4">
-              <span className="font-serif text-xs uppercase tracking-[0.25em] text-ink-faint">Sexo</span>
-              <div className="mt-2 flex gap-3">
+            <div className="flex flex-col justify-center">
+              <span className={labelClasses}>Sexo</span>
+              <div className="mt-2 flex gap-2">
                 {(['female', 'male'] as const).map((value) => (
                   <button
                     key={value}
                     type="button"
                     onClick={() => setFormData({ ...formData, gender: formData.gender === value ? '' : value })}
-                    className={`border px-4 py-1.5 font-serif text-sm uppercase tracking-[0.2em] transition-colors ${
+                    className={`flex-1 rounded-full border px-4 py-2.5 font-serif text-[0.65rem] uppercase tracking-[0.2em] transition-colors ${
                       formData.gender === value
                         ? 'border-ink bg-ink text-ivory'
-                        : 'border-ink/20 text-ink-soft hover:border-ink/50 hover:text-ink'
+                        : 'border-ink/20 text-ink-faint hover:border-ink/50 hover:text-ink'
                     }`}
                   >
                     {value === 'female' ? 'Mujer' : 'Hombre'}
@@ -740,14 +1131,23 @@ export default function AdminDashboard() {
                 ))}
               </div>
             </div>
-            <label className="flex items-center gap-3 pt-4">
+            <label className="flex items-center gap-3">
+              <input
+                type="checkbox"
+                checked={formData.is_godparent}
+                onChange={(e) => setFormData({ ...formData, is_godparent: e.target.checked })}
+                className="h-4 w-4 border-ink/30 accent-brass"
+              />
+              <span className="font-serif text-sm text-ink">Es padrino/madrina</span>
+            </label>
+            <label className="flex items-center gap-3">
               <input
                 type="checkbox"
                 checked={formData.is_courtesy}
                 onChange={(e) => setFormData({ ...formData, is_courtesy: e.target.checked })}
                 className="h-4 w-4 border-ink/30 accent-brass"
               />
-              <span className="font-serif text-sm uppercase tracking-[0.25em] text-ink">Invitación de cortesía</span>
+              <span className="font-serif text-sm text-ink">Invitación de cortesía</span>
             </label>
             {formData.is_courtesy && (
               <label className="block">
@@ -769,20 +1169,20 @@ export default function AdminDashboard() {
                 </span>
               </label>
             )}
-            <label className="block md:col-span-2">
+            <label className="block">
               <span className={labelClasses}>Nota del regalo</span>
               <textarea
                 value={formData.gift_description}
                 onChange={(e) => setFormData({ ...formData, gift_description: e.target.value })}
                 rows={2}
                 placeholder="Idealmente se asigna desde la invitación."
-                className="mt-2 w-full resize-none border-b border-ink/20 bg-transparent pb-2 font-serif text-lg font-light text-ink placeholder:text-ink/25 focus:border-brass focus:outline-none"
+                className="mt-2 w-full resize-none border-b border-ink/20 bg-transparent pb-2 font-serif text-base font-light text-ink placeholder:text-ink/25 focus:border-brass focus:outline-none"
               />
             </label>
 
             {message && (
               <div
-                className={`md:col-span-2 border px-5 py-4 font-serif text-sm ${
+                className={`border px-4 py-3 font-serif text-sm ${
                   message.type === 'success'
                     ? 'border-brass/40 bg-brass/10 text-brass'
                     : 'border-red-700/25 bg-red-700/10 text-red-700/80'
@@ -792,474 +1192,141 @@ export default function AdminDashboard() {
               </div>
             )}
 
-            <div className="md:col-span-2">
+            <button
+              type="submit"
+              className="w-full rounded-full border border-ink bg-ink py-3 font-serif text-sm uppercase tracking-[0.25em] text-ivory transition-colors hover:bg-ink/90"
+            >
+              Agregar invitado
+            </button>
+          </form>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={giftSheetOpen} onOpenChange={setGiftSheetOpen}>
+        <DialogContent className="top-auto bottom-0 flex max-h-[85dvh] translate-y-0 flex-col gap-3 rounded-b-none rounded-t-3xl bg-ivory p-5 pb-6 text-ink ring-ink/10 sm:max-w-md">
+          <div className="mx-auto h-1 w-10 shrink-0 rounded-full bg-ink/15" />
+          <DialogTitle className="font-serif text-xl font-light tracking-[-0.01em]">
+            {editingGiftId ? 'Editar regalo recibido' : 'Registrar regalo recibido'}
+          </DialogTitle>
+          <p className="font-serif text-xs italic text-ink-soft">
+            Registra aquí los regalos recibidos el día de la boda.
+          </p>
+
+          <form onSubmit={handleSaveGift} className="-mx-1 flex flex-col gap-5 overflow-y-auto px-1 pb-1">
+            <label className="block">
+              <span className={labelClasses}>Invitado (opcional)</span>
+              <select
+                value={giftForm.guest_id}
+                onChange={(e) => setGiftForm({ ...giftForm, guest_id: e.target.value })}
+                className={selectClasses}
+              >
+                <option value="">Sin vincular</option>
+                {guests.map((guest) => (
+                  <option key={guest.id} value={guest.id}>
+                    {guest.full_name}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label className="block">
+              <span className={labelClasses}>Tipo de regalo</span>
+              <select
+                value={giftForm.gift_type}
+                onChange={(e) => setGiftForm({ ...giftForm, gift_type: e.target.value })}
+                className={selectClasses}
+              >
+                {GIFT_TYPES.map((type) => (
+                  <option key={type.value} value={type.value}>
+                    {type.label}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label className="block">
+              <span className={labelClasses}>Monto en USD</span>
+              <input
+                type="text"
+                inputMode="decimal"
+                value={giftForm.amount_usd}
+                onChange={(e) => setGiftForm({ ...giftForm, amount_usd: formatVzAmount(e.target.value) })}
+                placeholder="0,00"
+                className={inputClasses}
+              />
+            </label>
+            <label className="block">
+              <span className={labelClasses}>Monto en Bs.</span>
+              <input
+                type="text"
+                inputMode="decimal"
+                value={giftForm.amount_bs}
+                onChange={(e) => setGiftForm({ ...giftForm, amount_bs: formatVzAmount(e.target.value) })}
+                placeholder="0,00"
+                className={inputClasses}
+              />
+            </label>
+            <label className="block">
+              <span className={labelClasses}>Fecha recibido</span>
+              <input
+                type="date"
+                value={giftForm.received_at}
+                onChange={(e) => setGiftForm({ ...giftForm, received_at: e.target.value })}
+                className={inputClasses}
+              />
+            </label>
+            <label className="block">
+              <span className={labelClasses}>Notas</span>
+              <input
+                type="text"
+                value={giftForm.notes}
+                onChange={(e) => setGiftForm({ ...giftForm, notes: e.target.value })}
+                placeholder="Ej. lo entregó en mano"
+                className={inputClasses}
+              />
+            </label>
+            <label className="block">
+              <span className={labelClasses}>Descripción</span>
+              <textarea
+                value={giftForm.description}
+                onChange={(e) => setGiftForm({ ...giftForm, description: e.target.value })}
+                rows={2}
+                placeholder="Ej. Juego de copas de cristal"
+                className="mt-2 w-full resize-none border-b border-ink/20 bg-transparent pb-2 font-serif text-base font-light text-ink placeholder:text-ink/25 focus:border-brass focus:outline-none"
+              />
+            </label>
+
+            {giftMessage && (
+              <div
+                className={`border px-4 py-3 font-serif text-sm ${
+                  giftMessage.type === 'success'
+                    ? 'border-brass/40 bg-brass/10 text-brass'
+                    : 'border-red-700/25 bg-red-700/10 text-red-700/80'
+                }`}
+              >
+                {giftMessage.text}
+              </div>
+            )}
+
+            <div className="flex gap-3">
               <button
                 type="submit"
-                className="inline-flex items-center gap-2 border border-ink bg-ink px-8 py-3 font-serif text-sm uppercase tracking-[0.25em] text-ivory transition-colors hover:bg-ink/90"
+                className="flex-1 rounded-full border border-ink bg-ink py-3 font-serif text-sm uppercase tracking-[0.25em] text-ivory transition-colors hover:bg-ink/90"
               >
-                <Plus className="h-4 w-4" />
-                Agregar invitado
+                {editingGiftId ? 'Guardar cambios' : 'Registrar regalo'}
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  resetGiftForm()
+                  setGiftSheetOpen(false)
+                }}
+                className="rounded-full border border-ink/30 px-6 py-3 font-serif text-sm uppercase tracking-[0.25em] text-ink transition-colors hover:bg-ink hover:text-ivory"
+              >
+                Cancelar
               </button>
             </div>
           </form>
-        </section>
-
-        {/* Guests table */}
-        <section className="overflow-hidden rounded-2xl border border-ink/10 bg-ivory-deep/40">
-          <div className="flex flex-wrap items-center justify-between gap-4 border-b border-ink/10 p-8">
-            <div>
-              <h2 className="font-serif text-2xl font-light text-ink">Invitados</h2>
-              <p className="mt-1 font-serif text-xs uppercase tracking-[0.3em] text-ink-faint">
-                {filteredGuests.length} de {guests.length} invitados
-              </p>
-            </div>
-            <label className="flex items-center gap-3 border-b border-ink/20 pb-1 focus-within:border-brass">
-              <Search className="h-4 w-4 text-ink-faint" />
-              <input
-                type="text"
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-                placeholder="Buscar por nombre o correo"
-                className="w-56 bg-transparent font-serif text-sm font-light text-ink placeholder:text-ink/30 focus:outline-none"
-              />
-            </label>
-          </div>
-
-          {loading ? (
-            <div className="p-12 text-center font-serif text-sm italic text-ink-soft">
-              Cargando invitados…
-            </div>
-          ) : guests.length === 0 ? (
-            <div className="p-12 text-center font-serif text-sm italic text-ink-soft">
-              Aún no hay invitados.
-            </div>
-          ) : filteredGuests.length === 0 ? (
-            <div className="p-12 text-center font-serif text-sm italic text-ink-soft">
-              Ningún invitado coincide con la búsqueda.
-            </div>
-          ) : (
-            <div className="overflow-x-auto">
-              <table className="w-full min-w-[900px]">
-                <thead className="border-b border-ink/10 bg-ivory-deep/60">
-                  <tr>
-                    <th className={`${labelClasses} px-6 py-3 text-left font-normal`}>Estado</th>
-                    <th className={`${labelClasses} px-6 py-3 text-left font-normal`}>Nombre</th>
-                   <th className={`${labelClasses} px-6 py-3 text-left font-normal`}>Correo</th>
-                    <th className={`${labelClasses} px-6 py-3 text-left font-normal`}>Acompañantes</th>
-                    <th className={`${labelClasses} px-6 py-3 text-left font-normal`}>Rol</th>
-                    <th className={`${labelClasses} px-6 py-3 text-left font-normal`}>Regalo</th>
-                    <th className={`${labelClasses} px-6 py-3 text-left font-normal`}>Registrado</th>
-                    <th className={`${labelClasses} px-6 py-3 text-right font-normal`}>Invitación</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {filteredGuests.map((guest) => {
-                    const gift = giftFor(guest)
-                    const status = statusFor(guest)
-                    return (
-                      <tr key={guest.id} className="border-b border-ink/10 transition-colors hover:bg-ivory-deep/40">
-                        <td className="px-6 py-4">
-                          <span
-                            className={`inline-block rounded-full border px-3 py-1 font-serif text-[0.65rem] uppercase tracking-[0.2em] ${status.className}`}
-                          >
-                            {status.label}
-                          </span>
-                          <button
-                            type="button"
-                            onClick={() => updateCourtesyStatus(guest, !guest.is_courtesy)}
-                            className="mt-2 block font-serif text-[0.65rem] uppercase tracking-[0.2em] text-ink-faint underline decoration-ink/25 underline-offset-4 transition-colors hover:text-ink"
-                          >
-                            {guest.is_courtesy ? 'Quitar cortesía' : 'Marcar como cortesía'}
-                          </button>
-                        </td>
-                        <td className="px-6 py-4">
-                          <p className="font-serif text-base font-light text-ink">{guest.full_name}</p>
-                          <p className="mt-0.5 font-serif text-xs italic text-ink-faint">{formatDate(guest.created_at)}</p>
-                          <div className="mt-2 flex gap-2">
-                            {(['female', 'male'] as const).map((value) => (
-                              <button
-                                key={value}
-                                type="button"
-                                onClick={() => updateGender(guest, value)}
-                                className={`border px-2.5 py-0.5 font-serif text-[0.65rem] uppercase tracking-[0.15em] transition-colors ${
-                                  guest.gender === value
-                                    ? 'border-ink bg-ink text-ivory'
-                                    : 'border-ink/20 text-ink-faint hover:border-ink/50 hover:text-ink'
-                                }`}
-                              >
-                                {value === 'female' ? 'Mujer' : 'Hombre'}
-                              </button>
-                            ))}
-                          </div>
-                        </td>
-                        <td className="px-6 py-4 font-serif text-sm font-light text-ink-soft">{guest.email}</td>
-                        <td className="px-6 py-4">
-                          <p className="font-serif text-sm tabular-nums text-ink">{guest.plus_ones}</p>
-                          {guest.is_courtesy && (
-                            <div className="mt-2">
-                              <p className="font-serif text-[0.65rem] uppercase tracking-[0.25em] text-ink-faint">
-                                Que asisten
-                              </p>
-                              <div className="mt-1.5 inline-flex items-center gap-2">
-                                <button
-                                  type="button"
-                                  aria-label="Quitar un acompañante que asiste"
-                                  onClick={() => updateCourtesyPlusOnes(guest, guest.courtesy_plus_ones - 1)}
-                                  disabled={guest.courtesy_plus_ones <= 0}
-                                  className="flex h-6 w-6 items-center justify-center border border-ink/20 font-serif text-sm text-ink transition-colors hover:border-ink/50 disabled:cursor-not-allowed disabled:opacity-30"
-                                >
-                                  −
-                                </button>
-                                <span className="w-6 text-center font-serif text-sm tabular-nums text-ink">
-                                  {guest.courtesy_plus_ones}
-                                </span>
-                                <button
-                                  type="button"
-                                  aria-label="Agregar un acompañante que asiste"
-                                  onClick={() => updateCourtesyPlusOnes(guest, guest.courtesy_plus_ones + 1)}
-                                  disabled={guest.courtesy_plus_ones >= guest.plus_ones}
-                                  className="flex h-6 w-6 items-center justify-center border border-ink/20 font-serif text-sm text-ink transition-colors hover:border-ink/50 disabled:cursor-not-allowed disabled:opacity-30"
-                                >
-                                  +
-                                </button>
-                              </div>
-                            </div>
-                          )}
-                        </td>
-                        <td className="px-6 py-4">
-                          {guest.is_godparent ? (
-                            <span className="inline-block rounded-full border border-brass/40 px-3 py-1 font-serif text-[0.65rem] uppercase tracking-[0.2em] text-brass">
-                              {guest.gender === 'female' ? 'Madrina' : 'Padrino'}
-                            </span>
-                          ) : (
-                            <span className="font-serif text-sm text-ink-faint">—</span>
-                          )}
-                        </td>
-                        <td className="px-6 py-4">
-                          {gift ? (
-                            <div>
-                              <p className="font-serif text-[0.65rem] uppercase tracking-[0.25em] text-ink-faint">{gift.label}</p>
-                              <p className="mt-1 font-serif text-sm font-light text-ink">{gift.value}</p>
-                            </div>
-                          ) : (
-                            <span className="font-serif text-sm text-ink-faint">—</span>
-                          )}
-                        </td>
-                        <td className="px-6 py-4 font-serif text-sm tabular-nums text-ink-soft">{formatDate(guest.created_at)}</td>
-                        <td className="px-6 py-4 text-right">
-                          <button
-                            type="button"
-                            onClick={() => copyToClipboard(guest.id)}
-                            className="inline-flex items-center gap-2 border border-ink/20 px-3 py-1.5 font-serif text-[0.65rem] uppercase tracking-[0.2em] text-ink-soft transition-colors hover:border-ink/50 hover:text-ink"
-                          >
-                            {copiedId === guest.id ? (
-                              <>
-                                <Check className="h-3 w-3" />
-                                Copiado
-                              </>
-                            ) : (
-                              <>
-                                <Copy className="h-3 w-3" />
-                                Copiar
-                              </>
-                            )}
-                          </button>
-                        </td>
-                      </tr>
-                    )
-                  })}
-                </tbody>
-              </table>
-            </div>
-          )}
-        </section>
-          </TabsContent>
-
-          <TabsContent value="regalos" className="focus:outline-none">
-            {/* Resumen */}
-            <section aria-label="Resumen de regalos recibidos">
-              <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-                <div className="rounded-2xl border border-brass/30 bg-brass/5 p-6">
-                  <p className={labelClasses}>Regalos recibidos</p>
-                  <p className="mt-2 font-serif text-3xl font-light tabular-nums text-brass">{giftTotals.count}</p>
-                </div>
-                <div className="rounded-2xl border border-brass/30 bg-brass/5 p-6">
-                  <p className={labelClasses}>Total en USD</p>
-                  <p className="mt-2 font-serif text-3xl font-light tabular-nums text-brass">{formatUsd(giftTotals.sum_usd)}</p>
-                </div>
-                <div className="rounded-2xl border border-brass/30 bg-brass/5 p-6">
-                  <p className={labelClasses}>Total en Bs.</p>
-                  <p className="mt-2 font-serif text-3xl font-light tabular-nums text-brass">{formatBs(giftTotals.sum_bs)}</p>
-                </div>
-              </div>
-            </section>
-
-            {/* Formulario */}
-            <section className={`${panelClasses} mb-12 mt-12 p-8`}>
-              <h2 className="font-serif text-2xl font-light text-ink">
-                {editingGiftId ? 'Editar regalo recibido' : 'Registrar regalo recibido'}
-              </h2>
-              <p className="mt-2 font-serif text-sm italic text-ink-soft">
-                Registra aquí los regalos recibidos el día de la boda.
-              </p>
-
-              <form onSubmit={handleSaveGift} className="mt-8 grid grid-cols-1 gap-8 md:grid-cols-2">
-                <label className="block">
-                  <span className={labelClasses}>Invitado (opcional)</span>
-                  <select
-                    value={giftForm.guest_id}
-                    onChange={(e) => setGiftForm({ ...giftForm, guest_id: e.target.value })}
-                    className={selectClasses}
-                  >
-                    <option value="">Sin vincular</option>
-                    {guests.map((guest) => (
-                      <option key={guest.id} value={guest.id}>
-                        {guest.full_name}
-                      </option>
-                    ))}
-                  </select>
-                </label>
-                <label className="block">
-                  <span className={labelClasses}>Tipo de regalo</span>
-                  <select
-                    value={giftForm.gift_type}
-                    onChange={(e) => setGiftForm({ ...giftForm, gift_type: e.target.value })}
-                    className={selectClasses}
-                  >
-                    {GIFT_TYPES.map((type) => (
-                      <option key={type.value} value={type.value}>
-                        {type.label}
-                      </option>
-                    ))}
-                  </select>
-                </label>
-                <label className="block">
-                  <span className={labelClasses}>Monto en USD</span>
-                  <input
-                    type="text"
-                    inputMode="decimal"
-                    value={giftForm.amount_usd}
-                    onChange={(e) => setGiftForm({ ...giftForm, amount_usd: formatVzAmount(e.target.value) })}
-                    placeholder="0,00"
-                    className={inputClasses}
-                  />
-                </label>
-                <label className="block">
-                  <span className={labelClasses}>Monto en Bs.</span>
-                  <input
-                    type="text"
-                    inputMode="decimal"
-                    value={giftForm.amount_bs}
-                    onChange={(e) => setGiftForm({ ...giftForm, amount_bs: formatVzAmount(e.target.value) })}
-                    placeholder="0,00"
-                    className={inputClasses}
-                  />
-                </label>
-                <label className="block">
-                  <span className={labelClasses}>Fecha recibido</span>
-                  <input
-                    type="date"
-                    value={giftForm.received_at}
-                    onChange={(e) => setGiftForm({ ...giftForm, received_at: e.target.value })}
-                    className={inputClasses}
-                  />
-                </label>
-                <label className="block">
-                  <span className={labelClasses}>Notas</span>
-                  <input
-                    type="text"
-                    value={giftForm.notes}
-                    onChange={(e) => setGiftForm({ ...giftForm, notes: e.target.value })}
-                    placeholder="Ej. lo entregó en mano"
-                    className={inputClasses}
-                  />
-                </label>
-                <label className="block md:col-span-2">
-                  <span className={labelClasses}>Descripción</span>
-                  <textarea
-                    value={giftForm.description}
-                    onChange={(e) => setGiftForm({ ...giftForm, description: e.target.value })}
-                    rows={2}
-                    placeholder="Ej. Juego de copas de cristal"
-                    className="mt-2 w-full resize-none border-b border-ink/20 bg-transparent pb-2 font-serif text-lg font-light text-ink placeholder:text-ink/25 focus:border-brass focus:outline-none"
-                  />
-                </label>
-
-                {giftMessage && (
-                  <div
-                    className={`md:col-span-2 border px-5 py-4 font-serif text-sm ${
-                      giftMessage.type === 'success'
-                        ? 'border-brass/40 bg-brass/10 text-brass'
-                        : 'border-red-700/25 bg-red-700/10 text-red-700/80'
-                    }`}
-                  >
-                    {giftMessage.text}
-                  </div>
-                )}
-
-                <div className="flex gap-4 md:col-span-2">
-                  <button
-                    type="submit"
-                    className="inline-flex items-center gap-2 border border-ink bg-ink px-8 py-3 font-serif text-sm uppercase tracking-[0.25em] text-ivory transition-colors hover:bg-ink/90"
-                  >
-                    <Gift className="h-4 w-4" />
-                    {editingGiftId ? 'Guardar cambios' : 'Registrar regalo'}
-                  </button>
-                  {editingGiftId && (
-                    <button
-                      type="button"
-                      onClick={resetGiftForm}
-                      className="border border-ink/30 px-8 py-3 font-serif text-sm uppercase tracking-[0.25em] text-ink transition-colors hover:bg-ink hover:text-ivory"
-                    >
-                      Cancelar
-                    </button>
-                  )}
-                </div>
-              </form>
-            </section>
-
-            {/* Tabla de regalos */}
-            <section className="overflow-hidden rounded-2xl border border-ink/10 bg-ivory-deep/40">
-              <div className="flex flex-wrap items-center justify-between gap-4 border-b border-ink/10 p-8">
-                <div>
-                  <h2 className="font-serif text-2xl font-light text-ink">Registros</h2>
-                  <p className="mt-1 font-serif text-xs uppercase tracking-[0.3em] text-ink-faint">
-                    {gifts.length} regalos recibidos
-                  </p>
-                </div>
-              </div>
-
-              {gifts.length === 0 ? (
-                <div className="p-12 text-center font-serif text-sm italic text-ink-soft">
-                  Aún no hay regalos registrados.
-                </div>
-              ) : (
-                <div className="overflow-x-auto">
-                  <table className="w-full min-w-[800px]">
-                    <thead className="border-b border-ink/10 bg-ivory-deep/60">
-                      <tr>
-                        <th className={`${labelClasses} px-6 py-3 text-left font-normal`}>Invitado</th>
-                        <th className={`${labelClasses} px-6 py-3 text-left font-normal`}>Tipo</th>
-                        <th className={`${labelClasses} px-6 py-3 text-left font-normal`}>Detalle</th>
-                        <th className={`${labelClasses} px-6 py-3 text-right font-normal`}>USD</th>
-                        <th className={`${labelClasses} px-6 py-3 text-right font-normal`}>Bs.</th>
-                        <th className={`${labelClasses} px-6 py-3 text-left font-normal`}>Fecha</th>
-                        <th className={`${labelClasses} px-6 py-3 text-right font-normal`}>Acciones</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {gifts.map((gift) => (
-                        <tr key={gift.id} className="border-b border-ink/10 transition-colors hover:bg-ivory-deep/40">
-                          <td className="px-6 py-4">
-                            <p className="font-serif text-base font-light text-ink">
-                              {gift.guest?.full_name ?? 'Sin vincular'}
-                            </p>
-                            {gift.notes && (
-                              <p className="mt-0.5 font-serif text-xs italic text-ink-faint">{gift.notes}</p>
-                            )}
-                          </td>
-                          <td className="px-6 py-4">
-                            <span className="inline-block rounded-full border border-brass/40 px-3 py-1 font-serif text-[0.65rem] uppercase tracking-[0.2em] text-brass">
-                              {giftTypeLabel(gift.gift_type)}
-                            </span>
-                          </td>
-                          <td className="px-6 py-4 font-serif text-sm font-light text-ink-soft">
-                            {gift.description ?? '—'}
-                          </td>
-                          <td className="px-6 py-4 text-right font-serif text-sm tabular-nums text-ink">
-                            {gift.amount_usd != null ? formatUsd(gift.amount_usd) : '—'}
-                          </td>
-                          <td className="px-6 py-4 text-right font-serif text-sm tabular-nums text-ink-soft">
-                            {gift.amount_bs != null ? formatBs(gift.amount_bs) : '—'}
-                          </td>
-                          <td className="px-6 py-4 font-serif text-sm tabular-nums text-ink-soft">
-                            {formatReceivedDate(gift.received_at)}
-                          </td>
-                          <td className="px-6 py-4 text-right">
-                            <div className="flex justify-end gap-2">
-                              <button
-                                type="button"
-                                onClick={() => handleEditGift(gift)}
-                                aria-label="Editar regalo"
-                                className="inline-flex h-8 w-8 items-center justify-center border border-ink/20 text-ink-soft transition-colors hover:border-ink/50 hover:text-ink"
-                              >
-                                <Pencil className="h-3.5 w-3.5" />
-                              </button>
-                              <button
-                                type="button"
-                                onClick={() => handleDeleteGift(gift.id)}
-                                aria-label="Eliminar regalo"
-                                className="inline-flex h-8 w-8 items-center justify-center border border-red-700/25 text-red-700/70 transition-colors hover:border-red-700/60 hover:text-red-700"
-                              >
-                                <Trash2 className="h-3.5 w-3.5" />
-                              </button>
-                            </div>
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              )}
-            </section>
-
-            {/* Comparativa */}
-            {declaredWithoutRecord.length > 0 && (
-              <section className="mt-8 rounded-2xl border border-ink/10 bg-ivory-deep/40 p-8">
-                <h2 className="font-serif text-2xl font-light text-ink">Declarados sin registrar</h2>
-                <p className="mt-2 font-serif text-sm italic text-ink-soft">
-                  Estos invitados declararon un regalo en su invitación pero aún no aparece en el registro recibido.
-                </p>
-                <ul className="mt-6 grid grid-cols-1 gap-3 sm:grid-cols-2">
-                  {declaredWithoutRecord.map((guest) => {
-                    const declared = giftFor(guest)
-                    return (
-                      <li
-                        key={guest.id}
-                        className="flex items-center justify-between gap-4 rounded-xl border border-ink/10 bg-ivory-deep/60 px-5 py-4"
-                      >
-                        <div>
-                          <p className="font-serif text-base font-light text-ink">{guest.full_name}</p>
-                          {declared && (
-                            <p className="mt-0.5 font-serif text-xs italic text-ink-faint">
-                              {declared.label}: {declared.value}
-                            </p>
-                          )}
-                        </div>
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setEditingGiftId(null)
-                            setGiftForm((prev) => ({
-                              ...prev,
-                              guest_id: guest.id,
-                              gift_type: guest.gift_type ?? 'fisico',
-                              description:
-                                guest.gift_type === 'fisico' ? (guest.gift_description ?? '') : '',
-                              amount_usd:
-                                guest.gift_amount_usd != null
-                                  ? formatVzAmount(String(guest.gift_amount_usd))
-                                  : '',
-                              amount_bs:
-                                guest.gift_amount_bs != null
-                                  ? formatVzAmount(String(guest.gift_amount_bs))
-                                  : '',
-                            }))
-                            setGiftMessage(null)
-                          }}
-                          className="border border-ink/30 px-4 py-2 font-serif text-[0.65rem] uppercase tracking-[0.2em] text-ink transition-colors hover:bg-ink hover:text-ivory"
-                        >
-                          Registrar
-                        </button>
-                      </li>
-                    )
-                  })}
-                </ul>
-              </section>
-            )}
-          </TabsContent>
-        </Tabs>
-      </main>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }
