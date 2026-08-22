@@ -114,7 +114,7 @@ function SheetContent({
       <DialogPrimitive.Popup
         data-slot="sheet-content"
         className={cn(
-          "fixed inset-x-0 bottom-0 z-50 mx-auto flex max-h-[92dvh] w-full max-w-md flex-col overflow-hidden rounded-t-3xl bg-popover text-sm text-popover-foreground ring-1 ring-foreground/10 outline-none sm:max-w-md",
+          "fixed inset-x-0 bottom-0 z-50 mx-auto flex max-h-[92dvh] w-full max-w-md flex-col gap-3 overflow-hidden rounded-t-3xl bg-popover px-5 pb-6 text-sm text-popover-foreground ring-1 ring-foreground/10 outline-none sm:max-w-md",
           className
         )}
         {...props}

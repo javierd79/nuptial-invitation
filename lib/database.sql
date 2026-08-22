@@ -226,3 +226,10 @@ CREATE TRIGGER update_chat_profiles_updated_at
 
 ALTER PUBLICATION supabase_realtime ADD TABLE public.chat_messages;
 ALTER PUBLICATION supabase_realtime ADD TABLE public.chat_message_status;
+
+-- -----------------------------------------------------------------------------
+-- Guest contact phone. Run in the Supabase SQL editor.
+-- Stored as E.164 without spaces: '+584121688466'. NULL = not provided yet.
+-- -----------------------------------------------------------------------------
+ALTER TABLE public.guests
+  ADD COLUMN IF NOT EXISTS phone TEXT;

@@ -6,7 +6,7 @@ import { AnimatePresence, motion, MotionConfig } from 'motion/react'
 import { createClient } from '@/lib/supabase/client'
 import { getUserWithRole, type AuthUser } from '@/lib/auth'
 import { Bell, BellRing, Check, ChevronDown, Copy, LogOut, Pencil, Plus, RefreshCw, Search, Trash2, X } from 'lucide-react'
-import { formatBs, formatUsd, formatUsdt, formatVzAmount, parseVzAmount } from '@/lib/format'
+import { formatBs, formatPhone, formatUsd, formatUsdt, formatVzAmount, parseVzAmount } from '@/lib/format'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Dialog, DialogTitle, SheetContent } from '@/components/ui/dialog'
 import { Collapse, SPRING_SOFT, Tappable } from '@/components/motion'
@@ -28,6 +28,7 @@ interface Guest {
   is_godparent: boolean
   is_attending: boolean | null
   gender: string | null
+  phone: string | null
   created_at: string
   updated_at: string | null
 }
@@ -68,6 +69,28 @@ const GIFT_TYPES = [
   { value: 'paypal', label: 'PayPal' },
   { value: 'otro', label: 'Otro' },
 ]
+
+const PHONE_COUNTRY_CODES = [
+  { value: '58', label: '+58' },
+  { value: '1', label: '+1' },
+  { value: '57', label: '+57' },
+]
+
+const PHONE_PREFIXES = [
+  { value: '412', label: '0412' },
+  { value: '422', label: '0422' },
+  { value: '416', label: '0416' },
+  { value: '414', label: '0414' },
+  { value: '424', label: '0424' },
+]
+
+interface PhoneDraft {
+  country: string
+  prefix: string
+  digits: string
+}
+
+const EMPTY_PHONE_DRAFT: PhoneDraft = { country: '58', prefix: '412', digits: '' }
 
 type RealtimeStatus = 'connecting' | 'live' | 'offline'
 
@@ -132,6 +155,8 @@ export default function AdminDashboard() {
   const [expandedGuestId, setExpandedGuestId] = useState<string | null>(null)
   const [addSheetOpen, setAddSheetOpen] = useState(false)
   const [giftSheetOpen, setGiftSheetOpen] = useState(false)
+  const [phoneEditorId, setPhoneEditorId] = useState<string | null>(null)
+  const [phoneDraft, setPhoneDraft] = useState<PhoneDraft>(EMPTY_PHONE_DRAFT)
 
   const { toasts, dismissToast, permission, requestPermission } = useGuestChangeNotifications({
     guests,
@@ -461,6 +486,56 @@ export default function AdminDashboard() {
     }
   }
 
+  const phoneDraftFor = (guest: Guest): PhoneDraft => {
+    const match = /^\+(\d{1,3})(\d+)$/.exec(guest.phone ?? '')
+    if (!match) return EMPTY_PHONE_DRAFT
+    const [, country, rest] = match
+    if (country === '58') {
+      return { country, prefix: rest.slice(0, 3), digits: rest.slice(3) }
+    }
+    return { country, prefix: '412', digits: rest }
+  }
+
+  const openPhoneEditor = (guest: Guest) => {
+    setPhoneDraft(phoneDraftFor(guest))
+    setPhoneEditorId(guest.id)
+  }
+
+  const closePhoneEditor = () => {
+    setPhoneEditorId(null)
+    setPhoneDraft(EMPTY_PHONE_DRAFT)
+  }
+
+  const savePhone = async (guest: Guest) => {
+    if (phoneDraft.digits.length !== (phoneDraft.country === '58' ? 7 : 10)) return
+    const prefix = phoneDraft.country === '58' ? phoneDraft.prefix : ''
+    const phone = `+${phoneDraft.country}${prefix}${phoneDraft.digits}`
+
+    setGuests((prev) => prev.map((g) => (g.id === guest.id ? { ...g, phone } : g)))
+    closePhoneEditor()
+
+    const supabase = createClient()
+    const { error } = await supabase.from('guests').update({ phone }).eq('id', guest.id)
+
+    if (error) {
+      console.error('Error updating guest phone:', error)
+      loadGuests()
+    }
+  }
+
+  const removePhone = async (guest: Guest) => {
+    setGuests((prev) => prev.map((g) => (g.id === guest.id ? { ...g, phone: null } : g)))
+    if (phoneEditorId === guest.id) closePhoneEditor()
+
+    const supabase = createClient()
+    const { error } = await supabase.from('guests').update({ phone: null }).eq('id', guest.id)
+
+    if (error) {
+      console.error('Error removing guest phone:', error)
+      loadGuests()
+    }
+  }
+
   const giftFor = (guest: Guest): { label: string; value: string } | null => {
     if (guest.gift_type === 'fisico') {
       return guest.gift_description ? { label: 'Físico', value: guest.gift_description } : null
@@ -520,6 +595,10 @@ export default function AdminDashboard() {
     'mt-2 w-full border-b border-ink/20 bg-transparent pb-2 font-serif text-lg font-light text-ink placeholder:text-ink/25 focus:border-brass focus:outline-none'
   const selectClasses =
     'mt-2 w-full border-b border-ink/20 bg-transparent pb-2 font-serif text-lg font-light text-ink focus:border-brass focus:outline-none'
+  const phoneFieldClasses =
+    'min-w-0 flex-1 border-b border-ink/20 bg-transparent pb-2 font-serif text-base font-light text-ink placeholder:text-ink/25 focus:border-brass focus:outline-none'
+  const phoneSelectClasses =
+    'border-b border-ink/20 bg-transparent pb-2 font-serif text-base font-light text-ink focus:border-brass focus:outline-none'
   const labelClasses = 'font-serif text-[0.6rem] uppercase tracking-[0.25em] text-ink-faint'
   const cardClasses = 'rounded-2xl border border-ink/10 bg-ivory-deep/40 p-4'
   const counterClasses =
@@ -643,7 +722,7 @@ export default function AdminDashboard() {
             </label>
 
             <Tabs value={activeTab} onValueChange={(value) => setActiveTab(String(value))} className="mt-6">
-              <TabsList variant="line" className="mb-5 grid h-auto w-full grid-cols-2 border-b border-ink/10">
+              <TabsList variant="line" className="mb-5 grid h-auto w-full grid-cols-2">
                 <TabsTrigger value="invitados" className={tabTriggerClasses}>
                   Invitados
                 </TabsTrigger>
@@ -891,6 +970,120 @@ export default function AdminDashboard() {
                                 )}
                               </div>
 
+                              <div>
+                                <p className={labelClasses}>Teléfono</p>
+                                {phoneEditorId === guest.id ? (
+                                  <motion.div
+                                    initial={{ opacity: 0, height: 0 }}
+                                    animate={{ opacity: 1, height: 'auto' }}
+                                    transition={SPRING_SOFT}
+                                    className="overflow-hidden"
+                                  >
+                                    <div className="mt-2 space-y-3">
+                                      <div className="flex items-end gap-2">
+                                        <select
+                                          value={phoneDraft.country}
+                                          onChange={(e) =>
+                                            setPhoneDraft((prev) => ({
+                                              ...prev,
+                                              country: e.target.value,
+                                              digits: prev.digits.slice(0, e.target.value === '58' ? 7 : 10),
+                                            }))
+                                          }
+                                          aria-label="Código de país"
+                                          className={`${phoneSelectClasses} w-20 shrink-0`}
+                                        >
+                                          {PHONE_COUNTRY_CODES.map((code) => (
+                                            <option key={code.value} value={code.value}>
+                                              {code.label}
+                                            </option>
+                                          ))}
+                                        </select>
+                                        {phoneDraft.country === '58' && (
+                                          <select
+                                            value={phoneDraft.prefix}
+                                            onChange={(e) =>
+                                              setPhoneDraft((prev) => ({ ...prev, prefix: e.target.value }))
+                                            }
+                                            aria-label="Prefijo"
+                                            className={`${phoneSelectClasses} w-[4.5rem] shrink-0`}
+                                          >
+                                            {PHONE_PREFIXES.map((prefix) => (
+                                              <option key={prefix.value} value={prefix.value}>
+                                                {prefix.label}
+                                              </option>
+                                            ))}
+                                          </select>
+                                        )}
+                                        <input
+                                          type="text"
+                                          inputMode="numeric"
+                                          autoComplete="off"
+                                          value={phoneDraft.digits}
+                                          onChange={(e) =>
+                                            setPhoneDraft((prev) => ({
+                                              ...prev,
+                                              digits: e.target.value.replace(/\D/g, '').slice(0, phoneDraft.country === '58' ? 7 : 10),
+                                            }))
+                                          }
+                                          placeholder={phoneDraft.country === '58' ? '0000000' : '0000000000'}
+                                          className={phoneFieldClasses}
+                                        />
+                                      </div>
+                                      <div className="flex gap-2">
+                                        <button
+                                          type="button"
+                                          onClick={() => savePhone(guest)}
+                                          disabled={
+                                            phoneDraft.digits.length !==
+                                            (phoneDraft.country === '58' ? 7 : 10)
+                                          }
+                                          className="flex-1 rounded-full border border-ink bg-ink py-2 font-serif text-[0.65rem] uppercase tracking-[0.25em] text-ivory transition-colors hover:bg-ink/90 disabled:pointer-events-none disabled:opacity-40"
+                                        >
+                                          Guardar
+                                        </button>
+                                        <button
+                                          type="button"
+                                          onClick={closePhoneEditor}
+                                          className="rounded-full border border-ink/30 px-6 py-2 font-serif text-[0.65rem] uppercase tracking-[0.25em] text-ink transition-colors hover:bg-ink hover:text-ivory"
+                                        >
+                                          Cancelar
+                                        </button>
+                                      </div>
+                                    </div>
+                                  </motion.div>
+                                ) : guest.phone ? (
+                                  <p className="mt-1 flex items-center justify-between gap-2 font-serif text-sm tabular-nums text-ink">
+                                    <span className="min-w-0 truncate">{formatPhone(guest.phone)}</span>
+                                    <span className="flex shrink-0 gap-3">
+                                      <button
+                                        type="button"
+                                        onClick={() => openPhoneEditor(guest)}
+                                        className="font-serif text-[0.6rem] uppercase tracking-[0.2em] text-ink-faint underline underline-offset-4 transition-colors hover:text-ink"
+                                      >
+                                        Editar
+                                      </button>
+                                      <button
+                                        type="button"
+                                        onClick={() => removePhone(guest)}
+                                        className="font-serif text-[0.6rem] uppercase tracking-[0.2em] text-red-700/70 underline underline-offset-4 transition-colors hover:text-red-700"
+                                      >
+                                        Eliminar
+                                      </button>
+                                    </span>
+                                  </p>
+                                ) : (
+                                  <button
+                                    type="button"
+                                    onClick={() => openPhoneEditor(guest)}
+                                    className="mt-1 inline-flex items-center gap-1.5 font-serif text-sm italic text-ink-faint underline underline-offset-4 transition-colors hover:text-ink"
+                                  >
+                                    <Plus className="h-3.5 w-3.5" />
+                                    Añadir teléfono
+                                  </button>
+                                )}
+                              </div>
+
                               <button
                                 type="button"
                                 onClick={() => copyToClipboard(guest.id)}
@@ -1118,10 +1311,10 @@ export default function AdminDashboard() {
           onCloseRequest={() => setAddSheetOpen(false)}
           className="bg-ivory text-ink ring-ink/10"
         >
-          <DialogTitle className="px-5 font-serif text-xl font-light tracking-[-0.01em]">
+          <DialogTitle className="font-serif text-xl font-light tracking-[-0.01em]">
             Agregar invitado
           </DialogTitle>
-          <p className="px-5 font-serif text-xs italic text-ink-soft">
+          <p className="font-serif text-xs italic text-ink-soft">
             Se envía el enlace personalizado al invitado para su invitación.
           </p>
 
@@ -1257,10 +1450,10 @@ export default function AdminDashboard() {
           onCloseRequest={() => setGiftSheetOpen(false)}
           className="bg-ivory text-ink ring-ink/10"
         >
-          <DialogTitle className="px-5 font-serif text-xl font-light tracking-[-0.01em]">
+          <DialogTitle className="font-serif text-xl font-light tracking-[-0.01em]">
             {editingGiftId ? 'Editar regalo recibido' : 'Registrar regalo recibido'}
           </DialogTitle>
-          <p className="px-5 font-serif text-xs italic text-ink-soft">
+          <p className="font-serif text-xs italic text-ink-soft">
             Registra aquí los regalos recibidos el día de la boda.
           </p>
 

@@ -5,10 +5,11 @@ import { useRouter } from 'next/navigation'
 import { AnimatePresence, motion, MotionConfig } from 'motion/react'
 import { createClient } from '@/lib/supabase/client'
 import { getUserWithRole, type AuthUser } from '@/lib/auth'
-import { Bell, BellRing, Check, ChevronUp, LogOut, Minus, Plus, Search, Users, X } from 'lucide-react'
+import { Bell, BellRing, Check, ChevronUp, Copy, LogOut, Minus, Phone, Plus, Search, Users, X } from 'lucide-react'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Dialog, DialogTitle, SheetContent } from '@/components/ui/dialog'
 import { SPRING_SOFT, Tappable } from '@/components/motion'
+import { formatPhone } from '@/lib/format'
 import { useGuestChangeNotifications } from '@/lib/use-guest-change-notifications'
 import ToastStack from '@/components/ToastStack'
 import ChatButton from '@/components/ChatButton'
@@ -27,6 +28,7 @@ interface Guest {
   attended_ceremony: boolean
   attended_brindis: boolean
   protocol_notes: string | null
+  phone: string | null
 }
 
 type RealtimeStatus = 'connecting' | 'live' | 'offline'
@@ -71,6 +73,7 @@ export default function ProtocolPage() {
   const [savedNoteId, setSavedNoteId] = useState<string | null>(null)
   const [activeTab, setActiveTab] = useState('rsvp')
   const [sheetOpen, setSheetOpen] = useState(false)
+  const [copiedPhoneId, setCopiedPhoneId] = useState<string | null>(null)
 
   const { toasts, dismissToast, permission, requestPermission } = useGuestChangeNotifications({
     guests,
@@ -156,6 +159,13 @@ export default function ProtocolPage() {
 
   const patchLocal = (id: string, patch: Partial<Guest>) =>
     setGuests((prev) => prev.map((g) => (g.id === id ? { ...g, ...patch } : g)))
+
+  const copyPhone = (guest: Guest) => {
+    if (!guest.phone) return
+    navigator.clipboard.writeText(guest.phone)
+    setCopiedPhoneId(guest.id)
+    setTimeout(() => setCopiedPhoneId(null), 2000)
+  }
 
   const setAttendance = async (guest: Guest, attending: boolean) => {
     const next = guest.is_attending === attending ? null : attending
@@ -460,7 +470,7 @@ export default function ProtocolPage() {
             </label>
 
             <Tabs value={activeTab} onValueChange={(value) => setActiveTab(String(value))} className="mt-6">
-              <TabsList variant="line" className="mb-5 grid h-auto w-full grid-cols-2 border-b border-ink/10">
+              <TabsList variant="line" className="mb-5 grid h-auto w-full grid-cols-2">
                 <TabsTrigger value="rsvp" className={tabTriggerClasses}>
                   RSVP
                 </TabsTrigger>
@@ -514,6 +524,24 @@ export default function ProtocolPage() {
                                   ? `+${guest.plus_ones} acompañante${guest.plus_ones > 1 ? 's' : ''}`
                                   : 'Sin acompañantes'}
                               </p>
+                              {guest.phone && (
+                                <p className="mt-1 flex items-center gap-1.5 font-serif text-xs tabular-nums text-ink-soft">
+                                  <Phone className="h-3 w-3 shrink-0 text-ink/40" />
+                                  <span className="min-w-0 truncate">{formatPhone(guest.phone)}</span>
+                                  <button
+                                    type="button"
+                                    onClick={() => copyPhone(guest)}
+                                    aria-label="Copiar teléfono"
+                                    className="inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-ink-faint transition-colors hover:bg-ink/5 hover:text-ink"
+                                  >
+                                    {copiedPhoneId === guest.id ? (
+                                      <Check className="h-3 w-3 text-brass" aria-label="Teléfono copiado" />
+                                    ) : (
+                                      <Copy className="h-3 w-3" />
+                                    )}
+                                  </button>
+                                </p>
+                              )}
                             </div>
                             <span
                               className={`shrink-0 rounded-full border px-3 py-1 font-serif text-[0.6rem] uppercase tracking-[0.2em] ${status.className}`}
@@ -621,6 +649,24 @@ export default function ProtocolPage() {
                                 ? `+${guest.plus_ones} acompañante${guest.plus_ones > 1 ? 's' : ''}`
                                 : 'Sin acompañantes'}
                             </p>
+                            {guest.phone && (
+                              <p className="mt-1 flex items-center gap-1.5 font-serif text-xs tabular-nums text-ink-soft">
+                                <Phone className="h-3 w-3 shrink-0 text-ink/40" />
+                                <span className="min-w-0 truncate">{formatPhone(guest.phone)}</span>
+                                <button
+                                  type="button"
+                                  onClick={() => copyPhone(guest)}
+                                  aria-label="Copiar teléfono"
+                                  className="inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-ink-faint transition-colors hover:bg-ink/5 hover:text-ink"
+                                >
+                                  {copiedPhoneId === guest.id ? (
+                                    <Check className="h-3 w-3 text-brass" aria-label="Teléfono copiado" />
+                                  ) : (
+                                    <Copy className="h-3 w-3" />
+                                  )}
+                                </button>
+                              </p>
+                            )}
                           </div>
                           {guest.is_courtesy && (
                             <span className="shrink-0 rounded-full border border-ink/15 bg-ink/5 px-3 py-1 font-serif text-[0.6rem] uppercase tracking-[0.2em] text-ink-soft">
@@ -676,7 +722,7 @@ export default function ProtocolPage() {
 
       <Dialog open={sheetOpen} onOpenChange={setSheetOpen}>
         <SheetContent onCloseRequest={() => setSheetOpen(false)} className="bg-ivory text-ink ring-ink/10">
-          <DialogTitle className="px-5 font-serif text-xl font-light tracking-[-0.01em]">
+          <DialogTitle className="font-serif text-xl font-light tracking-[-0.01em]">
             Llegados ({arrivedGuests.length})
           </DialogTitle>
 
