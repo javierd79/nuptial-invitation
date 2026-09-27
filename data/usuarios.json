@@ -1,0 +1,8 @@
+[
+  {
+    "username": "admin@nuptial.com",
+    "role": "ADMIN",
+    "salt": "9c2858a500ada339b184dda6bb4979ba",
+    "passHash": "c2db005917aabe2671913ff0b77e3d8b794c709c67d717de7505d0e55240f5d6c3b0e40591799467acf1b53c2e9e5516b75321da04edef23f3a32976a9123d71"
+  }
+]

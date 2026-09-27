@@ -1,8 +1,5 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-  typescript: {
-    ignoreBuildErrors: true,
-  },
   images: {
     unoptimized: true,
   },
@@ -11,6 +8,11 @@ const nextConfig = {
       {
         source: '/',
         headers: [{ key: 'Cache-Control', value: 'no-store' }],
+      },
+      {
+        // Guest data is read from JSON on every request; never serve it stale.
+        source: '/api/:path*',
+        headers: [{ key: 'Cache-Control', value: 'no-store, max-age=0' }],
       },
     ]
   },

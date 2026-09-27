@@ -1,37 +1,16 @@
 'use client'
 
-import { useCallback, useEffect, useMemo, useState } from 'react'
-import { useRouter } from 'next/navigation'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { AnimatePresence, motion, MotionConfig } from 'motion/react'
-import { createClient } from '@/lib/supabase/client'
-import { getUserWithRole, type AuthUser } from '@/lib/auth'
-import { Bell, BellRing, Check, ChevronDown, Copy, LogOut, Map, Pencil, Plus, RefreshCw, Search, Trash2, X } from 'lucide-react'
-import { formatBs, formatPhone, formatUsd, formatUsdt, formatVzAmount, parseVzAmount } from '@/lib/format'
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import { Check, ChevronDown, Copy, LogOut, Plus, RefreshCw, Search, Trash2, X } from 'lucide-react'
+import { logout } from '@/app/admin/login/actions'
+import { formatBs, formatPhone, formatUsd, formatUsdt } from '@/lib/format'
 import { Dialog, DialogTitle, SheetContent } from '@/components/ui/dialog'
 import { Collapse, SPRING_SOFT, Tappable } from '@/components/motion'
-import { useGuestChangeNotifications } from '@/lib/use-guest-change-notifications'
-import ToastStack from '@/components/ToastStack'
-import ChatButton from '@/components/ChatButton'
+import type { AdminGuestPatch, Gender, Guest, SessionUser } from '@/lib/data/types'
 
-interface Guest {
-  id: string
-  full_name: string
-  email: string
-  plus_ones: number
-  is_courtesy: boolean
-  courtesy_plus_ones: number
-  gift_description: string | null
-  gift_type: string | null
-  gift_amount_usd: number | null
-  gift_amount_bs: number | null
-  is_godparent: boolean
-  is_attending: boolean | null
-  gender: string | null
-  phone: string | null
-  created_at: string
-  updated_at: string | null
-}
+/** How often the panel re-reads the JSON file, replacing the old realtime feed. */
+const POLL_INTERVAL_MS = 15000
 
 interface Metrics {
   total_guests: number
@@ -47,28 +26,6 @@ interface Metrics {
   sum_usd: number
   sum_bs: number
 }
-
-interface ReceivedGift {
-  id: string
-  guest_id: string | null
-  guest?: { full_name: string } | null
-  gift_type: string | null
-  description: string | null
-  amount_usd: number | null
-  amount_bs: number | null
-  notes: string | null
-  received_at: string | null
-  created_at: string
-}
-
-const GIFT_TYPES = [
-  { value: 'fisico', label: 'Físico' },
-  { value: 'efectivo', label: 'Efectivo' },
-  { value: 'pago_movil', label: 'Pago móvil' },
-  { value: 'binance', label: 'Binance' },
-  { value: 'paypal', label: 'PayPal' },
-  { value: 'otro', label: 'Otro' },
-]
 
 const PHONE_COUNTRY_CODES = [
   { value: '58', label: '+58' },
@@ -92,7 +49,7 @@ interface PhoneDraft {
 
 const EMPTY_PHONE_DRAFT: PhoneDraft = { country: '58', prefix: '412', digits: '' }
 
-type RealtimeStatus = 'connecting' | 'live' | 'offline'
+type SyncState = 'loading' | 'live' | 'error'
 
 const EMPTY_METRICS: Metrics = {
   total_guests: 0,
@@ -112,24 +69,37 @@ const EMPTY_METRICS: Metrics = {
 const formatDate = (iso: string) =>
   new Date(iso).toLocaleDateString('es', { day: '2-digit', month: 'short', year: 'numeric' })
 
-const formatReceivedDate = (iso: string | null) =>
-  iso ? formatDate(iso) : '—'
+/** Thin wrapper so a failed request surfaces a message instead of a silent no-op. */
+async function apiRequest<T>(url: string, init?: RequestInit): Promise<T> {
+  const response = await fetch(url, {
+    ...init,
+    headers: init?.body ? { 'Content-Type': 'application/json' } : undefined,
+  })
 
-const giftTypeLabel = (value: string | null) =>
-  GIFT_TYPES.find((t) => t.value === value)?.label ?? value ?? '—'
+  if (response.status === 401) {
+    window.location.href = '/admin/login'
+    throw new Error('No autenticado.')
+  }
+
+  const payload = (await response.json().catch(() => ({}))) as T & { error?: string }
+
+  if (!response.ok) {
+    throw new Error(payload?.error ?? 'Error inesperado.')
+  }
+
+  return payload
+}
 
 export default function AdminDashboard() {
-  const router = useRouter()
   const [guests, setGuests] = useState<Guest[]>([])
   const [metrics, setMetrics] = useState<Metrics>(EMPTY_METRICS)
   const [loading, setLoading] = useState(true)
-  const [realtimeStatus, setRealtimeStatus] = useState<RealtimeStatus>('connecting')
+  const [sync, setSync] = useState<SyncState>('loading')
   const [search, setSearch] = useState('')
   const [formData, setFormData] = useState({
     full_name: '',
     email: '',
     plus_ones: '0',
-    gift_description: '',
     is_godparent: false,
     is_courtesy: false,
     courtesy_plus_ones: '0',
@@ -137,31 +107,17 @@ export default function AdminDashboard() {
   })
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null)
   const [copiedId, setCopiedId] = useState<string | null>(null)
-  const [gifts, setGifts] = useState<ReceivedGift[]>([])
-  const [giftForm, setGiftForm] = useState({
-    guest_id: '',
-    gift_type: 'fisico',
-    description: '',
-    amount_usd: '',
-    amount_bs: '',
-    notes: '',
-    received_at: '',
-  })
-  const [editingGiftId, setEditingGiftId] = useState<string | null>(null)
-  const [giftMessage, setGiftMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null)
-  const [user, setUser] = useState<AuthUser | null>(null)
-  const [activeTab, setActiveTab] = useState('invitados')
+  const [user, setUser] = useState<SessionUser | null>(null)
   const [metricsOpen, setMetricsOpen] = useState(false)
   const [expandedGuestId, setExpandedGuestId] = useState<string | null>(null)
   const [addSheetOpen, setAddSheetOpen] = useState(false)
-  const [giftSheetOpen, setGiftSheetOpen] = useState(false)
   const [phoneEditorId, setPhoneEditorId] = useState<string | null>(null)
   const [phoneDraft, setPhoneDraft] = useState<PhoneDraft>(EMPTY_PHONE_DRAFT)
-
-  const { toasts, dismissToast, permission, requestPermission } = useGuestChangeNotifications({
-    guests,
-    role: user?.role ?? null,
-  })
+  const [nameEditorId, setNameEditorId] = useState<string | null>(null)
+  const [nameDraft, setNameDraft] = useState('')
+  const [emailDraft, setEmailDraft] = useState('')
+  const [importMessage, setImportMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null)
+  const importInputRef = useRef<HTMLInputElement>(null)
 
   const calculateMetrics = (list: Guest[]) => {
     const attending = list.filter((g) => g.is_attending === true)
@@ -185,110 +141,65 @@ export default function AdminDashboard() {
   }
 
   const loadGuests = useCallback(async () => {
-    const supabase = createClient()
-    const { data, error } = await supabase
-      .from('guests')
-      .select('*')
-      .order('created_at', { ascending: false })
-
-    if (error) {
+    try {
+      const { guests: list } = await apiRequest<{ guests: Guest[] }>('/api/admin/guests')
+      setGuests(list)
+      calculateMetrics(list)
+      setSync('live')
+    } catch (error) {
       console.error('Error loading guests:', error)
-      return
+      setSync('error')
     }
-
-    setGuests(data || [])
-    calculateMetrics(data || [])
-  }, [])
-
-  const loadGifts = useCallback(async () => {
-    const supabase = createClient()
-    const { data, error } = await supabase
-      .from('received_gifts')
-      .select('*, guests(full_name)')
-      .order('created_at', { ascending: false })
-
-    if (error) {
-      console.error('Error loading gifts:', error)
-      return
-    }
-
-    setGifts((data as ReceivedGift[]) || [])
   }, [])
 
   useEffect(() => {
-    let mounted = true
-    const supabase = createClient()
+    let cancelled = false
 
     const init = async () => {
-      const {
-        data: { session },
-      } = await supabase.auth.getSession()
-
-      if (!session) {
-        router.push('/admin/login')
-        return
+      try {
+        const { user: sessionUser } = await apiRequest<{ user: SessionUser }>('/api/admin/session')
+        if (cancelled) return
+        setUser(sessionUser)
+        await loadGuests()
+        if (!cancelled) setLoading(false)
+      } catch (error) {
+        console.error('Error reading session:', error)
+        if (!cancelled) setLoading(false)
       }
-
-      const authUser = await getUserWithRole(supabase)
-
-      if (!authUser) {
-        await supabase.auth.signOut()
-        router.push('/admin/login')
-        return
-      }
-
-      if (authUser.role !== 'ADMIN') {
-        router.push('/admin/protocol')
-        return
-      }
-
-      if (!mounted) return
-      setUser(authUser)
-
-      await Promise.all([loadGuests(), loadGifts()])
-      if (!mounted) return
-      setLoading(false)
-
-      const channel = supabase
-        .channel('guests-realtime')
-        .on(
-          'postgres_changes',
-          { event: '*', schema: 'public', table: 'guests' },
-          () => {
-            loadGuests()
-          },
-        )
-        .subscribe((status) => {
-          if (!mounted) return
-          if (status === 'SUBSCRIBED') setRealtimeStatus('live')
-          else if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT' || status === 'CLOSED') {
-            setRealtimeStatus('offline')
-          }
-        })
-
-      const giftsChannel = supabase
-        .channel('gifts-realtime')
-        .on(
-          'postgres_changes',
-          { event: '*', schema: 'public', table: 'received_gifts' },
-          () => {
-            loadGifts()
-          },
-        )
-        .subscribe()
-
-      return [channel, giftsChannel]
     }
 
-    const channelsPromise = init()
-
+    init()
     return () => {
-      mounted = false
-      channelsPromise.then((channels) => {
-        channels?.forEach((channel) => supabase.removeChannel(channel))
-      })
+      cancelled = true
     }
-  }, [loadGuests, loadGifts, router])
+  }, [loadGuests])
+
+  // Stands in for the realtime subscription: the JSON file has no change feed.
+  useEffect(() => {
+    if (loading) return
+
+    const interval = setInterval(() => {
+      if (document.visibilityState === 'visible') loadGuests()
+    }, POLL_INTERVAL_MS)
+
+    return () => clearInterval(interval)
+  }, [loading, loadGuests])
+
+  const patchGuest = async (guest: Guest, patch: AdminGuestPatch) => {
+    setGuests((prev) =>
+      prev.map((item) => (item.id === guest.id ? { ...item, ...patch } : item)),
+    )
+
+    try {
+      await apiRequest(`/api/admin/guests/${guest.id}`, {
+        method: 'PATCH',
+        body: JSON.stringify(patch),
+      })
+    } catch (error) {
+      console.error('Error updating guest:', error)
+      loadGuests()
+    }
+  }
 
   const handleAddGuest = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -299,129 +210,37 @@ export default function AdminDashboard() {
     }
 
     try {
-      const supabase = createClient()
-      const { error } = await supabase.from('guests').insert([
-        {
+      await apiRequest<{ guest: Guest }>('/api/admin/guests', {
+        method: 'POST',
+        body: JSON.stringify({
           full_name: formData.full_name.trim(),
           email: formData.email.trim(),
           plus_ones: parseInt(formData.plus_ones) || 0,
-          gift_description: formData.gift_description.trim() || null,
           is_godparent: formData.is_godparent,
           is_courtesy: formData.is_courtesy,
           courtesy_plus_ones: formData.is_courtesy ? parseInt(formData.courtesy_plus_ones) || 0 : 0,
           gender: formData.gender || null,
-        },
-      ])
+        }),
+      })
 
-      if (error) {
-        setMessage({ type: 'error', text: `No se pudo agregar: ${error.message}` })
-      } else {
-        setMessage(null)
-        setFormData({
-          full_name: '',
-          email: '',
-          plus_ones: '0',
-          gift_description: '',
-          is_godparent: false,
-          is_courtesy: false,
-          courtesy_plus_ones: '0',
-          gender: '',
-        })
-        setAddSheetOpen(false)
-        loadGuests()
-      }
+      setMessage(null)
+      setFormData({
+        full_name: '',
+        email: '',
+        plus_ones: '0',
+        is_godparent: false,
+        is_courtesy: false,
+        courtesy_plus_ones: '0',
+        gender: '',
+      })
+      setAddSheetOpen(false)
+      loadGuests()
     } catch (error) {
-      console.error('Error adding guest:', error)
-      setMessage({ type: 'error', text: 'Error al agregar el invitado.' })
+      setMessage({
+        type: 'error',
+        text: error instanceof Error ? error.message : 'Error al agregar el invitado.',
+      })
     }
-  }
-
-  const resetGiftForm = () => {
-    setGiftForm({
-      guest_id: '',
-      gift_type: 'fisico',
-      description: '',
-      amount_usd: '',
-      amount_bs: '',
-      notes: '',
-      received_at: '',
-    })
-    setEditingGiftId(null)
-    setGiftMessage(null)
-  }
-
-  const handleSaveGift = async (e: React.FormEvent) => {
-    e.preventDefault()
-
-    if (!giftForm.description.trim() && !giftForm.amount_usd && !giftForm.amount_bs) {
-      setGiftMessage({ type: 'error', text: 'Agrega al menos una descripción o un monto.' })
-      return
-    }
-
-    const payload = {
-      guest_id: giftForm.guest_id || null,
-      gift_type: giftForm.gift_type,
-      description: giftForm.description.trim() || null,
-      amount_usd: parseVzAmount(giftForm.amount_usd) || null,
-      amount_bs: parseVzAmount(giftForm.amount_bs) || null,
-      notes: giftForm.notes.trim() || null,
-      received_at: giftForm.received_at || null,
-    }
-
-    try {
-      const supabase = createClient()
-      const { error } = editingGiftId
-        ? await supabase.from('received_gifts').update(payload).eq('id', editingGiftId)
-        : await supabase.from('received_gifts').insert([payload])
-
-      if (error) {
-        setGiftMessage({ type: 'error', text: `No se pudo guardar: ${error.message}` })
-      } else {
-        resetGiftForm()
-        setGiftSheetOpen(false)
-        loadGifts()
-      }
-    } catch (error) {
-      console.error('Error saving gift:', error)
-      setGiftMessage({ type: 'error', text: 'Error al guardar el regalo.' })
-    }
-  }
-
-  const handleEditGift = (gift: ReceivedGift) => {
-    setEditingGiftId(gift.id)
-    setGiftForm({
-      guest_id: gift.guest_id ?? '',
-      gift_type: gift.gift_type ?? 'fisico',
-      description: gift.description ?? '',
-      amount_usd: gift.amount_usd != null ? formatVzAmount(String(gift.amount_usd)) : '',
-      amount_bs: gift.amount_bs != null ? formatVzAmount(String(gift.amount_bs)) : '',
-      notes: gift.notes ?? '',
-      received_at: gift.received_at ?? '',
-    })
-    setGiftMessage(null)
-    setGiftSheetOpen(true)
-  }
-
-  const handleDeleteGift = async (id: string) => {
-    if (!window.confirm('¿Eliminar este regalo recibido?')) return
-
-    const supabase = createClient()
-    const { error } = await supabase.from('received_gifts').delete().eq('id', id)
-
-    if (error) {
-      console.error('Error deleting gift:', error)
-      setGiftMessage({ type: 'error', text: 'No se pudo eliminar el regalo.' })
-    } else {
-      setGiftMessage({ type: 'success', text: 'Regalo eliminado.' })
-      if (editingGiftId === id) resetGiftForm()
-      loadGifts()
-    }
-  }
-
-  const handleLogout = async () => {
-    const supabase = createClient()
-    await supabase.auth.signOut()
-    router.push('/admin/login')
   }
 
   const copyToClipboard = (id: string) => {
@@ -434,55 +253,99 @@ export default function AdminDashboard() {
   const updateCourtesyPlusOnes = async (guest: Guest, value: number) => {
     const next = Math.max(0, Math.min(value, guest.plus_ones))
     if (next === guest.courtesy_plus_ones) return
-
-    setGuests((prev) =>
-      prev.map((g) => (g.id === guest.id ? { ...g, courtesy_plus_ones: next } : g)),
-    )
-
-    const supabase = createClient()
-    const { error } = await supabase
-      .from('guests')
-      .update({ courtesy_plus_ones: next })
-      .eq('id', guest.id)
-
-    if (error) {
-      console.error('Error updating courtesy plus ones:', error)
-      loadGuests()
-    }
+    await patchGuest(guest, { courtesy_plus_ones: next })
   }
 
   const updateCourtesyStatus = async (guest: Guest, isCourtesy: boolean) => {
-    const courtesyPlusOnes = isCourtesy ? guest.courtesy_plus_ones : 0
+    await patchGuest(guest, {
+      is_courtesy: isCourtesy,
+      courtesy_plus_ones: isCourtesy ? guest.courtesy_plus_ones : 0,
+    })
+  }
 
-    setGuests((prev) =>
-      prev.map((g) =>
-        g.id === guest.id ? { ...g, is_courtesy: isCourtesy, courtesy_plus_ones: courtesyPlusOnes } : g,
-      ),
-    )
+  const updateGender = async (guest: Guest, gender: Gender) => {
+    await patchGuest(guest, { gender: guest.gender === gender ? null : gender })
+  }
 
-    const supabase = createClient()
-    const { error } = await supabase
-      .from('guests')
-      .update({ is_courtesy: isCourtesy, courtesy_plus_ones: courtesyPlusOnes })
-      .eq('id', guest.id)
+  const openNameEditor = (guest: Guest) => {
+    setNameDraft(guest.full_name)
+    setEmailDraft(guest.email)
+    setNameEditorId(guest.id)
+  }
 
-    if (error) {
-      console.error('Error updating courtesy status:', error)
+  const closeNameEditor = () => {
+    setNameEditorId(null)
+    setNameDraft('')
+    setEmailDraft('')
+  }
+
+  const saveName = async (guest: Guest) => {
+    const fullName = nameDraft.trim()
+    const email = emailDraft.trim().toLowerCase()
+
+    if (fullName === '') {
+      setMessage({ type: 'error', text: 'El nombre no puede quedar vacío.' })
+      return
+    }
+
+    // An empty email is valid (a couple can share one link), so only send the
+    // field when it actually changed.
+    const patch: AdminGuestPatch = { full_name: fullName }
+    if (email !== '' && email !== guest.email) patch.email = email
+
+    closeNameEditor()
+    await patchGuest(guest, patch)
+  }
+
+  const removeGuest = async (guest: Guest) => {
+    if (!window.confirm(`¿Eliminar a ${guest.full_name}? Su enlace dejará de funcionar.`)) return
+
+    try {
+      await apiRequest(`/api/admin/guests/${guest.id}`, { method: 'DELETE' })
       loadGuests()
+    } catch (error) {
+      console.error('Error deleting guest:', error)
     }
   }
 
-  const updateGender = async (guest: Guest, gender: string) => {
-    const next = guest.gender === gender ? null : gender
+  const handleImportFile = async (file: File) => {
+    setImportMessage(null)
 
-    setGuests((prev) => prev.map((g) => (g.id === guest.id ? { ...g, gender: next } : g)))
+    let rows: unknown
+    try {
+      rows = JSON.parse(await file.text())
+    } catch {
+      setImportMessage({ type: 'error', text: 'El archivo no es JSON válido.' })
+      return
+    }
 
-    const supabase = createClient()
-    const { error } = await supabase.from('guests').update({ gender: next }).eq('id', guest.id)
+    if (!Array.isArray(rows)) {
+      setImportMessage({ type: 'error', text: 'El archivo debe contener un arreglo de invitados.' })
+      return
+    }
 
-    if (error) {
-      console.error('Error updating gender:', error)
+    if (!window.confirm(`Esto reemplaza los ${guests.length} invitados actuales por ${rows.length}. ¿Continuar?`)) {
+      return
+    }
+
+    try {
+      const { imported, skipped } = await apiRequest<{ imported: number; skipped: number }>(
+        '/api/admin/import',
+        { method: 'POST', body: JSON.stringify(rows) },
+      )
+      setImportMessage({
+        type: 'success',
+        text:
+          skipped > 0
+            ? `Se importaron ${imported} invitados; se omitieron ${skipped} filas sin id válido o con correo repetido.`
+            : `Se importaron ${imported} invitados.`,
+      })
       loadGuests()
+    } catch (error) {
+      setImportMessage({
+        type: 'error',
+        text: error instanceof Error ? error.message : 'No se pudo importar.',
+      })
     }
   }
 
@@ -511,29 +374,13 @@ export default function AdminDashboard() {
     const prefix = phoneDraft.country === '58' ? phoneDraft.prefix : ''
     const phone = `+${phoneDraft.country}${prefix}${phoneDraft.digits}`
 
-    setGuests((prev) => prev.map((g) => (g.id === guest.id ? { ...g, phone } : g)))
     closePhoneEditor()
-
-    const supabase = createClient()
-    const { error } = await supabase.from('guests').update({ phone }).eq('id', guest.id)
-
-    if (error) {
-      console.error('Error updating guest phone:', error)
-      loadGuests()
-    }
+    await patchGuest(guest, { phone })
   }
 
   const removePhone = async (guest: Guest) => {
-    setGuests((prev) => prev.map((g) => (g.id === guest.id ? { ...g, phone: null } : g)))
     if (phoneEditorId === guest.id) closePhoneEditor()
-
-    const supabase = createClient()
-    const { error } = await supabase.from('guests').update({ phone: null }).eq('id', guest.id)
-
-    if (error) {
-      console.error('Error removing guest phone:', error)
-      loadGuests()
-    }
+    await patchGuest(guest, { phone: null })
   }
 
   const giftFor = (guest: Guest): { label: string; value: string } | null => {
@@ -577,24 +424,8 @@ export default function AdminDashboard() {
     )
   })
 
-  const giftTotals = useMemo(
-    () => ({
-      count: gifts.length,
-      sum_usd: gifts.reduce((sum, g) => sum + (g.amount_usd ?? 0), 0),
-      sum_bs: gifts.reduce((sum, g) => sum + (g.amount_bs ?? 0), 0),
-    }),
-    [gifts],
-  )
-
-  const declaredWithoutRecord = useMemo(() => {
-    const recordedIds = new Set(gifts.map((g) => g.guest_id).filter((id): id is string => Boolean(id)))
-    return guests.filter((g) => (g.gift_type != null || g.gift_description) && !recordedIds.has(g.id))
-  }, [gifts, guests])
-
   const inputClasses =
     'mt-2 w-full border-b border-ink/20 bg-transparent pb-2 font-serif text-lg font-light text-ink placeholder:text-ink/25 focus:border-brass focus:outline-none'
-  const selectClasses =
-    'mt-2 w-full border-b border-ink/20 bg-transparent pb-2 font-serif text-lg font-light text-ink focus:border-brass focus:outline-none'
   const phoneFieldClasses =
     'min-w-0 flex-1 border-b border-ink/20 bg-transparent pb-2 font-serif text-base font-light text-ink placeholder:text-ink/25 focus:border-brass focus:outline-none'
   const phoneSelectClasses =
@@ -603,16 +434,12 @@ export default function AdminDashboard() {
   const cardClasses = 'rounded-2xl border border-ink/10 bg-ivory-deep/40 p-4'
   const counterClasses =
     'rounded-xl border border-ink/10 bg-ivory-deep/40 px-3 py-2.5 text-center'
-  const tabTriggerClasses =
-    'h-auto w-full py-3 font-serif text-xs uppercase tracking-[0.3em] text-ink-faint data-active:text-ink data-active:after:bg-brass hover:text-yellow-400'
   const fabClasses =
     'fixed bottom-5 left-1/2 z-40 flex -translate-x-1/2 items-center gap-2 rounded-full border border-brass bg-brass px-6 py-3 font-serif text-xs uppercase tracking-[0.25em] text-ivory shadow-lg shadow-ink/15 transition-colors hover:bg-brass/90'
 
   return (
     <MotionConfig reducedMotion="user">
       <div className="min-h-screen bg-ivory text-ink">
-        <ToastStack toasts={toasts} onDismiss={dismissToast} />
-
       <header className="sticky top-0 z-10 border-b border-ink/10 bg-ivory/95 backdrop-blur">
         <div className="mx-auto flex w-full max-w-md items-center justify-between gap-3 px-4 py-4 md:max-w-2xl">
           <div className="min-w-0">
@@ -623,18 +450,18 @@ export default function AdminDashboard() {
           </div>
           <div className="flex shrink-0 items-center gap-2">
             <span
-              aria-label="Estado de conexión"
+              aria-label="Estado de sincronización"
               title={
-                realtimeStatus === 'live'
-                  ? 'En vivo'
-                  : realtimeStatus === 'offline'
-                    ? 'Sin conexión'
-                    : 'Conectando'
+                sync === 'live'
+                  ? 'Sincronizado'
+                  : sync === 'error'
+                    ? 'Error al leer los datos'
+                    : 'Cargando'
               }
               className={`h-1.5 w-1.5 shrink-0 rounded-full ${
-                realtimeStatus === 'live'
+                sync === 'live'
                   ? 'bg-brass'
-                  : realtimeStatus === 'offline'
+                  : sync === 'error'
                     ? 'bg-red-700/70'
                     : 'bg-ink-faint animate-pulse'
               }`}
@@ -646,52 +473,21 @@ export default function AdminDashboard() {
             )}
             <button
               type="button"
-              onClick={() => router.push('/admin/seating')}
-              aria-label="Plano del salón"
-              title="Plano del salón"
-              className="inline-flex h-9 w-9 items-center justify-center rounded-full border border-ink/30 text-ink transition-colors hover:bg-ink hover:text-ivory"
-            >
-              <Map className="h-4 w-4" />
-            </button>
-            <ChatButton user={user} />
-            {permission !== 'unsupported' && (
-              <button
-                type="button"
-                onClick={requestPermission}
-                disabled={permission !== 'default'}
-                title={
-                  permission === 'granted'
-                    ? 'Notificaciones activadas'
-                    : permission === 'denied'
-                      ? 'Notificaciones bloqueadas en el navegador'
-                      : 'Activar notificaciones del navegador'
-                }
-                aria-label="Notificaciones"
-                className={`inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full border transition-colors ${
-                  permission === 'granted'
-                    ? 'border-brass bg-brass/10 text-brass'
-                    : 'border-ink/30 text-ink hover:bg-ink hover:text-ivory disabled:cursor-not-allowed disabled:opacity-40'
-                }`}
-              >
-                {permission === 'granted' ? <BellRing className="h-4 w-4" /> : <Bell className="h-4 w-4" />}
-              </button>
-            )}
-            <button
-              type="button"
               onClick={loadGuests}
               aria-label="Refrescar invitados"
               className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-ink/30 text-ink transition-colors hover:bg-ink hover:text-ivory"
             >
               <RefreshCw className="h-4 w-4" />
             </button>
-            <button
-              type="button"
-              onClick={handleLogout}
-              aria-label="Cerrar sesión"
-              className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-ink/30 text-ink transition-colors hover:bg-ink hover:text-ivory"
-            >
-              <LogOut className="h-4 w-4" />
-            </button>
+            <form action={logout}>
+              <button
+                type="submit"
+                aria-label="Cerrar sesión"
+                className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-ink/30 text-ink transition-colors hover:bg-ink hover:text-ivory"
+              >
+                <LogOut className="h-4 w-4" />
+              </button>
+            </form>
           </div>
         </div>
       </header>
@@ -730,22 +526,12 @@ export default function AdminDashboard() {
               </div>
             </label>
 
-            <Tabs value={activeTab} onValueChange={(value) => setActiveTab(String(value))} className="mt-6">
-              <TabsList variant="line" className="mb-5 grid h-auto w-full grid-cols-2">
-                <TabsTrigger value="invitados" className={tabTriggerClasses}>
-                  Invitados
-                </TabsTrigger>
-                <TabsTrigger value="regalos" className={tabTriggerClasses}>
-                  Regalos
-                </TabsTrigger>
-              </TabsList>
-
-              <TabsContent value="invitados" className="focus:outline-none pb-24">
-                <motion.div
-                  initial={{ opacity: 0, y: 6 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ duration: 0.18 }}
-                >
+            <motion.div
+              className="mt-6 pb-24"
+              initial={{ opacity: 0, y: 6 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.18 }}
+            >
                 <section aria-label="Métricas de invitados">
                   <div className="grid grid-cols-3 gap-2">
                     <div className={`${counterClasses} border-brass/30 bg-brass/10`}>
@@ -907,7 +693,63 @@ export default function AdminDashboard() {
                           <Collapse open={expanded}>
                             <div className="mt-4 space-y-4 border-t border-ink/10 pt-4">
                               <div>
-                                <p className="break-all font-serif text-xs text-ink-soft">{guest.email}</p>
+                                {nameEditorId === guest.id ? (
+                                  <div className="space-y-2">
+                                    <div className="flex items-end gap-2">
+                                      <input
+                                        type="text"
+                                        value={nameDraft}
+                                        autoFocus
+                                        onChange={(e) => setNameDraft(e.target.value)}
+                                        onKeyDown={(e) => {
+                                          if (e.key === 'Enter') saveName(guest)
+                                          if (e.key === 'Escape') closeNameEditor()
+                                        }}
+                                        aria-label="Nombre completo"
+                                        className={phoneFieldClasses}
+                                      />
+                                      <button
+                                        type="button"
+                                        onClick={() => saveName(guest)}
+                                        className="shrink-0 rounded-full border border-ink bg-ink px-4 py-1.5 font-serif text-[0.6rem] uppercase tracking-[0.2em] text-ivory"
+                                      >
+                                        Guardar
+                                      </button>
+                                    </div>
+                                    <input
+                                      type="email"
+                                      value={emailDraft}
+                                      onChange={(e) => setEmailDraft(e.target.value)}
+                                      onKeyDown={(e) => {
+                                        if (e.key === 'Enter') saveName(guest)
+                                        if (e.key === 'Escape') closeNameEditor()
+                                      }}
+                                      placeholder="correo (opcional)"
+                                      aria-label="Correo electrónico"
+                                      className={`${phoneFieldClasses} text-sm`}
+                                    />
+                                  </div>
+                                ) : (
+                                  <div className="flex items-center justify-between gap-2">
+                                    <p className="min-w-0 truncate font-serif text-base font-light">
+                                      {guest.full_name}
+                                    </p>
+                                    <button
+                                      type="button"
+                                      onClick={() => openNameEditor(guest)}
+                                      className="shrink-0 font-serif text-[0.6rem] uppercase tracking-[0.2em] text-ink-faint underline underline-offset-4 transition-colors hover:text-ink"
+                                    >
+                                      Editar
+                                    </button>
+                                  </div>
+                                )}
+                                {nameEditorId !== guest.id && (
+                                  <p
+                                    className={`mt-0.5 break-all font-serif text-xs ${guest.email === '' ? 'italic text-ink-faint' : 'text-ink-soft'}`}
+                                  >
+                                    {guest.email === '' ? 'sin correo' : guest.email}
+                                  </p>
+                                )}
                                 <p className="mt-0.5 font-serif text-[0.65rem] italic text-ink-faint">
                                   Registrado · {formatDate(guest.created_at)}
                                 </p>
@@ -1093,23 +935,33 @@ export default function AdminDashboard() {
                                 )}
                               </div>
 
-                              <button
-                                type="button"
-                                onClick={() => copyToClipboard(guest.id)}
-                                className="w-full rounded-full border border-ink/20 py-2.5 font-serif text-[0.65rem] uppercase tracking-[0.25em] text-ink transition-colors hover:bg-ink hover:text-ivory"
-                              >
-                                {copiedId === guest.id ? (
-                                  <span className="inline-flex items-center justify-center gap-2">
-                                    <Check className="h-3.5 w-3.5" />
-                                    Enlace copiado
-                                  </span>
-                                ) : (
-                                  <span className="inline-flex items-center justify-center gap-2">
-                                    <Copy className="h-3.5 w-3.5" />
-                                    Copiar invitación
-                                  </span>
-                                )}
-                              </button>
+                              <div className="flex gap-2">
+                                <button
+                                  type="button"
+                                  onClick={() => copyToClipboard(guest.id)}
+                                  className="flex-1 rounded-full border border-ink/20 py-2.5 font-serif text-[0.65rem] uppercase tracking-[0.25em] text-ink transition-colors hover:bg-ink hover:text-ivory"
+                                >
+                                  {copiedId === guest.id ? (
+                                    <span className="inline-flex items-center justify-center gap-2">
+                                      <Check className="h-3.5 w-3.5" />
+                                      Enlace copiado
+                                    </span>
+                                  ) : (
+                                    <span className="inline-flex items-center justify-center gap-2">
+                                      <Copy className="h-3.5 w-3.5" />
+                                      Copiar invitación
+                                    </span>
+                                  )}
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => removeGuest(guest)}
+                                  aria-label="Eliminar invitado"
+                                  className="inline-flex w-11 shrink-0 items-center justify-center rounded-full border border-red-700/25 text-red-700/70 transition-colors hover:border-red-700/60 hover:text-red-700"
+                                >
+                                  <Trash2 className="h-4 w-4" />
+                                </button>
+                              </div>
                             </div>
                           </Collapse>
                         </motion.li>
@@ -1117,164 +969,49 @@ export default function AdminDashboard() {
                     })}
                   </ul>
                 )}
-                </motion.div>
-              </TabsContent>
 
-              <TabsContent value="regalos" className="focus:outline-none pb-24">
-                <motion.div
-                  initial={{ opacity: 0, y: 6 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ duration: 0.18 }}
-                >
-                <section aria-label="Resumen de regalos recibidos">
-                  <div className="grid grid-cols-3 gap-2">
-                    <div className={`${counterClasses} border-brass/30 bg-brass/10`}>
-                      <p className="font-serif text-2xl font-light tabular-nums text-brass">{giftTotals.count}</p>
-                      <p className="mt-0.5 font-serif text-[0.55rem] uppercase tracking-[0.2em] text-ink-faint">
-                        Recibidos
-                      </p>
-                    </div>
-                    <div className={counterClasses}>
-                      <p className="font-serif text-lg font-light tabular-nums">{formatUsd(giftTotals.sum_usd)}</p>
-                      <p className="mt-0.5 font-serif text-[0.55rem] uppercase tracking-[0.2em] text-ink-faint">
-                        Total USD
-                      </p>
-                    </div>
-                    <div className={counterClasses}>
-                      <p className="font-serif text-lg font-light tabular-nums">{formatBs(giftTotals.sum_bs)}</p>
-                      <p className="mt-0.5 font-serif text-[0.55rem] uppercase tracking-[0.2em] text-ink-faint">
-                        Total Bs.
-                      </p>
-                    </div>
-                  </div>
-                </section>
-
-                {gifts.length === 0 ? (
-                  <p className="py-12 text-center font-serif text-sm italic text-ink-soft">
-                    Aún no hay regalos registrados.
+                <section aria-label="Restaurar lista" className="mt-10 border-t border-ink/10 pt-6">
+                  <p className={labelClasses}>Restaurar lista desde archivo</p>
+                  <p className="mt-1 font-serif text-xs italic text-ink-soft">
+                    Reemplaza todos los invitados actuales por el contenido de un
+                    <code className="mx-1 font-serif">invitados.json</code>. Se usa una sola vez para
+                    migrar los datos de Supabase.
                   </p>
-                ) : (
-                  <ul className="mt-5 grid grid-cols-1 gap-3 sm:grid-cols-2 sm:items-start">
-                    {gifts.map((gift) => (
-                      <motion.li
-                        key={gift.id}
-                        layout
-                        transition={SPRING_SOFT}
-                        className={cardClasses}
-                      >
-                        <div className="flex items-start justify-between gap-3">
-                          <div className="min-w-0">
-                            <p className="truncate font-serif text-lg font-light">
-                              {gift.guest?.full_name ?? 'Sin vincular'}
-                            </p>
-                            {gift.notes && (
-                              <p className="mt-0.5 font-serif text-xs italic text-ink-faint">{gift.notes}</p>
-                            )}
-                          </div>
-                          <span className="shrink-0 rounded-full border border-brass/40 bg-brass/5 px-3 py-1 font-serif text-[0.6rem] uppercase tracking-[0.2em] text-brass">
-                            {giftTypeLabel(gift.gift_type)}
-                          </span>
-                        </div>
-
-                        {gift.description && (
-                          <p className="mt-2 font-serif text-sm font-light text-ink-soft">{gift.description}</p>
-                        )}
-
-                        <div className="mt-3 flex items-center justify-between gap-2 rounded-full border border-ink/10 px-4 py-2 font-serif text-sm tabular-nums">
-                          <span>{gift.amount_usd != null ? formatUsd(gift.amount_usd) : '—'}</span>
-                          <span className="text-ink-soft">{gift.amount_bs != null ? formatBs(gift.amount_bs) : '—'}</span>
-                        </div>
-
-                        <div className="mt-3 flex items-center justify-between">
-                          <span className="font-serif text-[0.65rem] italic text-ink-faint">
-                            {formatReceivedDate(gift.received_at)}
-                          </span>
-                          <span className="flex gap-2">
-                            <button
-                              type="button"
-                              onClick={() => handleEditGift(gift)}
-                              aria-label="Editar regalo"
-                              className="inline-flex h-8 w-8 items-center justify-center rounded-full border border-ink/20 text-ink-soft transition-colors hover:border-ink/50 hover:text-ink"
-                            >
-                              <Pencil className="h-3.5 w-3.5" />
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() => handleDeleteGift(gift.id)}
-                              aria-label="Eliminar regalo"
-                              className="inline-flex h-8 w-8 items-center justify-center rounded-full border border-red-700/25 text-red-700/70 transition-colors hover:border-red-700/60 hover:text-red-700"
-                            >
-                              <Trash2 className="h-3.5 w-3.5" />
-                            </button>
-                          </span>
-                        </div>
-                      </motion.li>
-                    ))}
-                  </ul>
-                )}
-
-                {declaredWithoutRecord.length > 0 && (
-                  <section className="mt-8" aria-label="Declarados sin registrar">
-                    <h2 className="font-serif text-xl font-light text-ink">Declarados sin registrar</h2>
-                    <p className="mt-1 font-serif text-xs italic text-ink-soft">
-                      Declararon un regalo en su invitación pero aún no aparece en el registro recibido.
+                  <input
+                    ref={importInputRef}
+                    type="file"
+                    accept="application/json,.json"
+                    className="hidden"
+                    onChange={(e) => {
+                      const file = e.target.files?.[0]
+                      if (file) handleImportFile(file)
+                      e.target.value = ''
+                    }}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => importInputRef.current?.click()}
+                    className="mt-3 w-full rounded-full border border-ink/20 py-2.5 font-serif text-[0.65rem] uppercase tracking-[0.25em] text-ink transition-colors hover:bg-ink hover:text-ivory"
+                  >
+                    Importar invitados.json
+                  </button>
+                  {importMessage && (
+                    <p
+                      className={`mt-2 font-serif text-sm ${
+                        importMessage.type === 'success' ? 'text-brass' : 'text-red-700/80'
+                      }`}
+                    >
+                      {importMessage.text}
                     </p>
-                    <ul className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2 sm:items-start">
-                      {declaredWithoutRecord.map((guest) => {
-                        const declared = giftFor(guest)
-                        return (
-                          <li key={guest.id} className={cardClasses}>
-                            <div className="flex items-start justify-between gap-3">
-                              <div className="min-w-0">
-                                <p className="truncate font-serif text-base font-light">{guest.full_name}</p>
-                                {declared && (
-                                  <p className="mt-0.5 truncate font-serif text-xs italic text-ink-faint">
-                                    {declared.label}: {declared.value}
-                                  </p>
-                                )}
-                              </div>
-                              <button
-                                type="button"
-                                onClick={() => {
-                                  setEditingGiftId(null)
-                                  setGiftForm((prev) => ({
-                                    ...prev,
-                                    guest_id: guest.id,
-                                    gift_type: guest.gift_type ?? 'fisico',
-                                    description:
-                                      guest.gift_type === 'fisico' ? (guest.gift_description ?? '') : '',
-                                    amount_usd:
-                                      guest.gift_amount_usd != null
-                                        ? formatVzAmount(String(guest.gift_amount_usd))
-                                        : '',
-                                    amount_bs:
-                                      guest.gift_amount_bs != null
-                                        ? formatVzAmount(String(guest.gift_amount_bs))
-                                        : '',
-                                  }))
-                                  setGiftMessage(null)
-                                  setGiftSheetOpen(true)
-                                }}
-                                className="shrink-0 rounded-full border border-ink/30 px-4 py-2 font-serif text-[0.6rem] uppercase tracking-[0.2em] text-ink transition-colors hover:bg-ink hover:text-ivory"
-                              >
-                                Registrar
-                              </button>
-                            </div>
-                          </li>
-                        )
-                      })}
-                    </ul>
-                  </section>
-                )}
+                  )}
+                </section>
                 </motion.div>
-              </TabsContent>
-            </Tabs>
           </>
         )}
       </main>
 
       <AnimatePresence mode="popLayout">
-        {!loading && activeTab === 'invitados' && !addSheetOpen && (
+        {!loading && !addSheetOpen && (
           <motion.button
             key="fab-invitado"
             type="button"
@@ -1294,25 +1031,6 @@ export default function AdminDashboard() {
           </motion.button>
         )}
 
-        {!loading && activeTab === 'regalos' && !giftSheetOpen && (
-          <motion.button
-            key="fab-regalo"
-            type="button"
-            onClick={() => {
-              resetGiftForm()
-              setGiftSheetOpen(true)
-            }}
-            initial={{ opacity: 0, y: 24, scale: 0.9 }}
-            animate={{ opacity: 1, y: 0, scale: 1 }}
-            exit={{ opacity: 0, y: 24, scale: 0.9 }}
-            transition={SPRING_SOFT}
-            whileTap={{ scale: 0.94 }}
-            className={fabClasses}
-          >
-            <Plus className="h-4 w-4" />
-            Regalo
-          </motion.button>
-        )}
       </AnimatePresence>
 
       <Dialog open={addSheetOpen} onOpenChange={setAddSheetOpen}>
@@ -1421,17 +1139,6 @@ export default function AdminDashboard() {
                 </span>
               </label>
             )}
-            <label className="block">
-              <span className={labelClasses}>Nota del regalo</span>
-              <textarea
-                value={formData.gift_description}
-                onChange={(e) => setFormData({ ...formData, gift_description: e.target.value })}
-                rows={2}
-                placeholder="Idealmente se asigna desde la invitación."
-                className="mt-2 w-full resize-none border-b border-ink/20 bg-transparent pb-2 font-serif text-base font-light text-ink placeholder:text-ink/25 focus:border-brass focus:outline-none"
-              />
-            </label>
-
             {message && (
               <div
                 className={`border px-4 py-3 font-serif text-sm ${
@@ -1454,133 +1161,6 @@ export default function AdminDashboard() {
         </SheetContent>
       </Dialog>
 
-      <Dialog open={giftSheetOpen} onOpenChange={setGiftSheetOpen}>
-        <SheetContent
-          onCloseRequest={() => setGiftSheetOpen(false)}
-          className="bg-ivory text-ink ring-ink/10"
-        >
-          <DialogTitle className="font-serif text-xl font-light tracking-[-0.01em]">
-            {editingGiftId ? 'Editar regalo recibido' : 'Registrar regalo recibido'}
-          </DialogTitle>
-          <p className="font-serif text-xs italic text-ink-soft">
-            Registra aquí los regalos recibidos el día de la boda.
-          </p>
-
-          <form onSubmit={handleSaveGift} className="-mx-1 flex flex-col gap-5 overflow-y-auto px-1 pb-1">
-            <label className="block">
-              <span className={labelClasses}>Invitado (opcional)</span>
-              <select
-                value={giftForm.guest_id}
-                onChange={(e) => setGiftForm({ ...giftForm, guest_id: e.target.value })}
-                className={selectClasses}
-              >
-                <option value="">Sin vincular</option>
-                {guests.map((guest) => (
-                  <option key={guest.id} value={guest.id}>
-                    {guest.full_name}
-                  </option>
-                ))}
-              </select>
-            </label>
-            <label className="block">
-              <span className={labelClasses}>Tipo de regalo</span>
-              <select
-                value={giftForm.gift_type}
-                onChange={(e) => setGiftForm({ ...giftForm, gift_type: e.target.value })}
-                className={selectClasses}
-              >
-                {GIFT_TYPES.map((type) => (
-                  <option key={type.value} value={type.value}>
-                    {type.label}
-                  </option>
-                ))}
-              </select>
-            </label>
-            <label className="block">
-              <span className={labelClasses}>Monto en USD</span>
-              <input
-                type="text"
-                inputMode="decimal"
-                value={giftForm.amount_usd}
-                onChange={(e) => setGiftForm({ ...giftForm, amount_usd: formatVzAmount(e.target.value) })}
-                placeholder="0,00"
-                className={inputClasses}
-              />
-            </label>
-            <label className="block">
-              <span className={labelClasses}>Monto en Bs.</span>
-              <input
-                type="text"
-                inputMode="decimal"
-                value={giftForm.amount_bs}
-                onChange={(e) => setGiftForm({ ...giftForm, amount_bs: formatVzAmount(e.target.value) })}
-                placeholder="0,00"
-                className={inputClasses}
-              />
-            </label>
-            <label className="block">
-              <span className={labelClasses}>Fecha recibido</span>
-              <input
-                type="date"
-                value={giftForm.received_at}
-                onChange={(e) => setGiftForm({ ...giftForm, received_at: e.target.value })}
-                className={inputClasses}
-              />
-            </label>
-            <label className="block">
-              <span className={labelClasses}>Notas</span>
-              <input
-                type="text"
-                value={giftForm.notes}
-                onChange={(e) => setGiftForm({ ...giftForm, notes: e.target.value })}
-                placeholder="Ej. lo entregó en mano"
-                className={inputClasses}
-              />
-            </label>
-            <label className="block">
-              <span className={labelClasses}>Descripción</span>
-              <textarea
-                value={giftForm.description}
-                onChange={(e) => setGiftForm({ ...giftForm, description: e.target.value })}
-                rows={2}
-                placeholder="Ej. Juego de copas de cristal"
-                className="mt-2 w-full resize-none border-b border-ink/20 bg-transparent pb-2 font-serif text-base font-light text-ink placeholder:text-ink/25 focus:border-brass focus:outline-none"
-              />
-            </label>
-
-            {giftMessage && (
-              <div
-                className={`border px-4 py-3 font-serif text-sm ${
-                  giftMessage.type === 'success'
-                    ? 'border-brass/40 bg-brass/10 text-brass'
-                    : 'border-red-700/25 bg-red-700/10 text-red-700/80'
-                }`}
-              >
-                {giftMessage.text}
-              </div>
-            )}
-
-            <div className="flex gap-3">
-              <Tappable
-                type="submit"
-                className="flex-1 rounded-full border border-ink bg-ink py-3 font-serif text-sm uppercase tracking-[0.25em] text-ivory"
-              >
-                {editingGiftId ? 'Guardar cambios' : 'Registrar regalo'}
-              </Tappable>
-              <Tappable
-                type="button"
-                onClick={() => {
-                  resetGiftForm()
-                  setGiftSheetOpen(false)
-                }}
-                className="rounded-full border border-ink/30 px-6 py-3 font-serif text-sm uppercase tracking-[0.25em] text-ink transition-colors hover:bg-ink hover:text-ivory"
-              >
-                Cancelar
-              </Tappable>
-            </div>
-          </form>
-        </SheetContent>
-      </Dialog>
     </div>
     </MotionConfig>
   )

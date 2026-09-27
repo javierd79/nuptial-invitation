@@ -1,6 +1,6 @@
 import type { Metadata } from 'next'
 import WeddingInvitation from '@/components/WeddingInvitation'
-import { createClient } from '@/lib/supabase/server'
+import { getPublicGuest, isGuestId } from '@/lib/data/guests'
 import {
   OG_IMAGE,
   SITE_URL,
@@ -12,11 +12,9 @@ interface PageProps {
   searchParams: Promise<{ guest?: string | string[] }>
 }
 
-const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
-
 function getGuestId(value: string | string[] | undefined) {
   const guestId = typeof value === 'string' ? value : null
-  return guestId && UUID_PATTERN.test(guestId) ? guestId : null
+  return isGuestId(guestId) ? guestId : null
 }
 
 function getInvitationUrl(guestId: string | null) {
@@ -25,28 +23,15 @@ function getInvitationUrl(guestId: string | null) {
   return url
 }
 
-async function getGuestName(guestId: string | null) {
-  if (!guestId) return null
-
-  try {
-    const supabase = await createClient()
-    const { data } = await supabase
-      .from('guests')
-      .select('full_name')
-      .eq('id', guestId)
-      .maybeSingle()
-
-    const name = data?.full_name?.trim().replace(/\s+/g, ' ').slice(0, 80)
-    return name || null
-  } catch {
-    return null
-  }
+function cleanName(name: string | null | undefined) {
+  return name?.trim().replace(/\s+/g, ' ').slice(0, 80) || null
 }
 
 export async function generateMetadata({ searchParams }: PageProps): Promise<Metadata> {
   const { guest } = await searchParams
   const guestId = getGuestId(guest)
-  const guestName = await getGuestName(guestId)
+  const guestName = cleanName(guestId ? (await getPublicGuest(guestId))?.full_name : null)
+
   const title = guestName ? `${guestName}, estás invitado a nuestra boda` : WEDDING_TITLE
   const description = guestName
     ? `${guestName}, queremos compartir contigo nuestro día más especial. ${WEDDING_DESCRIPTION}`
@@ -86,5 +71,8 @@ export async function generateMetadata({ searchParams }: PageProps): Promise<Met
 
 export default async function Page({ searchParams }: PageProps) {
   const { guest } = await searchParams
-  return <WeddingInvitation guestId={getGuestId(guest)} />
+  const guestId = getGuestId(guest)
+  const guestData = guestId ? await getPublicGuest(guestId) : null
+
+  return <WeddingInvitation guest={guestData} />
 }

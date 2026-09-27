@@ -7,9 +7,15 @@ __v0_jsx-dev-runtime.ts
 .vercel/
 
 # Environment variables
+.env
 .env*.local
+
+# Local copies of the guest data
+data/*.bak.json
+data/*.tmp.json
 
 # Common ignores
 node_modules
 .next/
+tsconfig.tsbuildinfo
 .DS_Store

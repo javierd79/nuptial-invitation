@@ -1,18 +1,19 @@
 {
-  "name": "my-project",
+  "name": "nuptial-invitation",
   "version": "0.1.0",
   "private": true,
+  "packageManager": "bun@1.4.0",
   "scripts": {
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint ."
+    "password": "node scripts/hash-password.mjs",
+    "export": "node scripts/export-from-supabase.mjs"
   },
   "dependencies": {
     "@base-ui/react": "^1.5.0",
-    "@supabase/ssr": "^0.12.4",
-    "@supabase/supabase-js": "^2.111.0",
     "@vercel/analytics": "1.6.1",
+    "@vercel/blob": "^2.0.0",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "lucide-react": "^1.16.0",
@@ -32,10 +33,5 @@
     "postcss": "^8.5",
     "tailwindcss": "^4.3.3",
     "typescript": "5.7.3"
-  },
-  "pnpm": {
-    "overrides": {
-      "hono": "4.12.25"
-    }
   }
 }

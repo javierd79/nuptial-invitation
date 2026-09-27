@@ -1,0 +1,20 @@
+[
+  {
+    "id": "4d5d943c-63ae-4ca6-8e9e-595cda4bca86",
+    "full_name": "Tomás & Lucero",
+    "email": "tomas.lucero@example.com",
+    "gender": null,
+    "plus_ones": 0,
+    "is_courtesy": false,
+    "courtesy_plus_ones": 0,
+    "is_godparent": false,
+    "is_attending": true,
+    "phone": null,
+    "gift_type": null,
+    "gift_description": null,
+    "gift_amount_usd": null,
+    "gift_amount_bs": null,
+    "created_at": "2026-09-27T04:42:33.044Z",
+    "updated_at": "2026-09-27T04:43:48.936Z"
+  }
+]

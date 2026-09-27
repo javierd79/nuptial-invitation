@@ -1,55 +1,22 @@
-'use client'
+import { login } from './actions'
+import SubmitButton from './submit-button'
 
-import { useState } from 'react'
-import { useRouter } from 'next/navigation'
-import { createClient } from '@/lib/supabase/client'
-import { getUserWithRole, roleHome } from '@/lib/auth'
+const ERRORS: Record<string, string> = {
+  'faltan-datos': 'Usuario y contraseña son obligatorios.',
+  credenciales: 'Usuario o contraseña incorrectos.',
+}
 
-export default function AdminLoginPage() {
-  const [email, setEmail] = useState('')
-  const [password, setPassword] = useState('')
-  const [loading, setLoading] = useState(false)
-  const [error, setError] = useState('')
-  const router = useRouter()
+const LABEL = 'font-serif text-[0.65rem] uppercase tracking-[0.3em] text-ink-faint'
+const INPUT =
+  'mt-2 w-full border-b border-ink/20 bg-transparent pb-2 font-serif text-lg font-light text-ink placeholder:text-ink/25 focus:border-brass focus:outline-none'
 
-  const handleLogin = async (e: React.FormEvent) => {
-    e.preventDefault()
-    setLoading(true)
-    setError('')
-
-    try {
-      const supabase = createClient()
-
-      const { error: authError } = await supabase.auth.signInWithPassword({
-        email,
-        password,
-      })
-
-      if (authError) {
-        setError(authError.message)
-        setLoading(false)
-        return
-      }
-
-      const user = await getUserWithRole(supabase)
-
-      if (!user) {
-        await supabase.auth.signOut()
-        setError('Usuario sin rol asignado. Contacta al administrador.')
-        setLoading(false)
-        return
-      }
-
-      router.push(roleHome(user.role))
-    } catch (err: any) {
-      setError(err.message || 'An error occurred')
-      setLoading(false)
-    }
-  }
-
-  const labelClasses = 'font-serif text-[0.65rem] uppercase tracking-[0.3em] text-ink-faint'
-  const inputClasses =
-    'mt-2 w-full border-b border-ink/20 bg-transparent pb-2 font-serif text-lg font-light text-ink placeholder:text-ink/25 focus:border-brass focus:outline-none'
+export default async function AdminLoginPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ error?: string }>
+}) {
+  const { error } = await searchParams
+  const message = error === undefined ? undefined : ERRORS[error]
 
   return (
     <div className="flex min-h-screen items-center justify-center bg-ivory p-6 text-ink">
@@ -64,46 +31,40 @@ export default function AdminLoginPage() {
           </p>
         </div>
 
-        <form onSubmit={handleLogin} className="space-y-8">
+        <form action={login} className="space-y-8">
           <label className="block">
-            <span className={labelClasses}>Correo electrónico</span>
+            <span className={LABEL}>Usuario</span>
             <input
-              type="email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
+              type="text"
+              name="username"
+              autoComplete="username"
+              autoCapitalize="none"
+              spellCheck={false}
               required
-              autoComplete="email"
-              placeholder="admin@correo.com"
-              className={inputClasses}
+              placeholder="admin"
+              className={INPUT}
             />
           </label>
 
           <label className="block">
-            <span className={labelClasses}>Contraseña</span>
+            <span className={LABEL}>Contraseña</span>
             <input
               type="password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              required
+              name="password"
               autoComplete="current-password"
+              required
               placeholder="••••••••"
-              className={inputClasses}
+              className={INPUT}
             />
           </label>
 
-          {error && (
+          {message !== undefined && (
             <div className="border border-red-700/25 bg-red-700/10 px-5 py-4 font-serif text-sm text-red-700/80">
-              {error}
+              {message}
             </div>
           )}
 
-          <button
-            type="submit"
-            disabled={loading}
-            className="w-full border border-ink bg-ink py-3 font-serif text-sm uppercase tracking-[0.25em] text-ivory transition-colors hover:bg-ink/90 disabled:cursor-not-allowed disabled:opacity-45"
-          >
-            {loading ? 'Entrando…' : 'Entrar'}
-          </button>
+          <SubmitButton />
         </form>
 
         <div className="mt-12 border-t border-ink/10 pt-8 text-center">

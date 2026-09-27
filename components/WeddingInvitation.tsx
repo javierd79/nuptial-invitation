@@ -3,23 +3,11 @@
 import { useEffect, useRef, useState } from 'react'
 import type { ReactNode } from 'react'
 import { AnimatePresence, MotionConfig, motion } from 'motion/react'
-import { createClient } from '@/lib/supabase/client'
 import { formatVzAmount, parseVzAmount } from '@/lib/format'
+import type { GuestGiftPatch, PublicGuest } from '@/lib/data/types'
 import { ColorStack } from './ui/color-stack'
 
-interface GuestData {
-  id: string
-  full_name: string
-  email: string
-  plus_ones: number
-  gift_description: string | null
-  gift_type: string | null
-  gift_amount_usd: number | null
-  gift_amount_bs: number | null
-  is_godparent: boolean
-  is_attending: boolean | null
-  gender: string | null
-}
+type GuestData = PublicGuest
 
 interface Countdown {
   days: number
@@ -148,7 +136,8 @@ const PHOTO_SPANS = [
 ]
 
 interface WeddingInvitationProps {
-  guestId: string | null
+  /** Already resolved on the server from `?guest=<uuid>`; null when unknown. */
+  guest: PublicGuest | null
 }
 
 const sectionTransition = { type: 'spring', bounce: 0, duration: 0.7 } as const
@@ -267,10 +256,9 @@ function GiftFeedback({ saved, error }: { saved: boolean; error: boolean }) {
   )
 }
 
-export default function WeddingInvitation({ guestId }: WeddingInvitationProps) {
+export default function WeddingInvitation({ guest }: WeddingInvitationProps) {
   const [phase, setPhase] = useState<Phase>('validating')
-  const [guestData, setGuestData] = useState<GuestData | null>(null)
-  const [validationError, setValidationError] = useState(false)
+  const [guestData, setGuestData] = useState<GuestData | null>(guest)
   const [loadProgress, setLoadProgress] = useState(0)
   const [videoUrl, setVideoUrl] = useState<string | null>(null)
   const [countdown, setCountdown] = useState<Countdown>({
@@ -361,35 +349,6 @@ export default function WeddingInvitation({ guestId }: WeddingInvitationProps) {
     return () => clearInterval(interval)
   }, [])
 
-  // Validate guest with Supabase
-  const validateGuest = async (): Promise<boolean> => {
-    if (!guestId) {
-      setValidationError(true)
-      return false
-    }
-
-    try {
-      const supabase = createClient()
-      const { data, error } = await supabase
-        .from('guests')
-        .select('*')
-        .eq('id', guestId)
-        .single()
-
-      if (error || !data) {
-        setValidationError(true)
-        return false
-      }
-
-      setGuestData(data as GuestData)
-      return true
-    } catch (err) {
-      console.error('[v0] Error validating guest:', err)
-      setValidationError(true)
-      return false
-    }
-  }
-
   // Preload and cache the video and letter image during the loading screen
   const preloadAssets = async () => {
     const img = new Image()
@@ -434,8 +393,7 @@ export default function WeddingInvitation({ guestId }: WeddingInvitationProps) {
     let cancelled = false
 
     const init = async () => {
-      const isValid = await validateGuest()
-      if (cancelled || !isValid) return
+      if (guest === null) return
 
       await preloadAssets()
       if (!cancelled) setPhase('envelope')
@@ -445,7 +403,7 @@ export default function WeddingInvitation({ guestId }: WeddingInvitationProps) {
     return () => {
       cancelled = true
     }
-  }, [])
+  }, [guest])
 
   // Clean up the cached video blob when leaving the page
   useEffect(() => {
@@ -503,12 +461,21 @@ export default function WeddingInvitation({ guestId }: WeddingInvitationProps) {
     setRsvpError(false)
 
     try {
-      const supabase = createClient()
-      await supabase.from('guests').update({ is_attending: attending }).eq('id', guestData.id)
+      const response = await fetch('/api/rsvp', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ guestId: guestData.id, attending }),
+      })
+
+      if (!response.ok) {
+        console.error('[invitacion] Error updating RSVP:', response.status)
+        setRsvpError(true)
+        return
+      }
 
       setGuestData({ ...guestData, is_attending: attending })
     } catch (err) {
-      console.error('[v0] Error updating RSVP:', err)
+      console.error('[invitacion] Error updating RSVP:', err)
       setRsvpError(true)
     } finally {
       setRsvpStatus('idle')
@@ -522,7 +489,7 @@ export default function WeddingInvitation({ guestId }: WeddingInvitationProps) {
     setGiftError(false)
     setGiftSaved(false)
 
-    const payload: Partial<GuestData> = {}
+    const payload: Partial<GuestGiftPatch> = {}
     if (giftMode === 'inmediato' && immediateGift === 'pago_movil') {
       const amount = parseVzAmount(giftBsAmount)
       payload.gift_type = amount > 0 ? 'pago_movil' : null
@@ -559,61 +526,62 @@ export default function WeddingInvitation({ guestId }: WeddingInvitationProps) {
     }
 
     try {
-      const supabase = createClient()
-      const { error } = await supabase
-        .from('guests')
-        .update(payload)
-        .eq('id', guestData.id)
+      const response = await fetch('/api/gift', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ guestId: guestData.id, ...payload }),
+      })
 
-      if (error) {
-        console.error('[v0] Error saving gift:', error)
+      if (!response.ok) {
+        console.error('[invitacion] Error saving gift:', response.status)
         setGiftError(true)
       } else {
         setGiftSaved(true)
         setGuestData({ ...guestData, ...payload })
       }
     } catch (err) {
-      console.error('[v0] Error saving gift:', err)
+      console.error('[invitacion] Error saving gift:', err)
       setGiftError(true)
     } finally {
       setGiftStatus('idle')
     }
   }
 
-  // Validating Phase
-  if (phase === 'validating') {
-    if (validationError) {
-      return (
-        <div className="flex min-h-screen items-center justify-center bg-ivory p-6">
-          <div className="w-full max-w-md">
-            <div className="mb-12 text-center">
-              <div className="mx-auto mb-8 h-12 w-1 bg-ink/15"></div>
-              <h1 className="mb-6 font-serif text-4xl font-light tracking-tight text-ink">
-                Acceso denegado
-              </h1>
-              <Ornament className="mx-auto mb-8" />
-            </div>
+  // Access denied Phase
+  if (guest === null) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-ivory p-6">
+        <div className="w-full max-w-md">
+          <div className="mb-12 text-center">
+            <div className="mx-auto mb-8 h-12 w-1 bg-ink/15"></div>
+            <h1 className="mb-6 font-serif text-4xl font-light tracking-tight text-ink">
+              Acceso denegado
+            </h1>
+            <Ornament className="mx-auto mb-8" />
+          </div>
 
-            <div className="space-y-8 text-center">
-              <p className="font-serif text-base font-light leading-relaxed text-ink-soft">
-                Lo sentimos, esta invitación requiere un enlace de acceso válido. Revisa tu correo
-                para asegurarte de tener el enlace correcto.
+          <div className="space-y-8 text-center">
+            <p className="font-serif text-base font-light leading-relaxed text-ink-soft">
+              Lo sentimos, esta invitación requiere un enlace de acceso válido. Revisa tu correo
+              para asegurarte de tener el enlace correcto.
+            </p>
+
+            <div className="border-t border-ink/10 pt-8">
+              <p className="mb-4 font-serif text-xs uppercase tracking-[0.3em] text-ink-faint">
+                ¿Necesitas ayuda?
               </p>
-
-              <div className="border-t border-ink/10 pt-8">
-                <p className="mb-4 font-serif text-xs uppercase tracking-[0.3em] text-ink-faint">
-                  ¿Necesitas ayuda?
-                </p>
-                <p className="font-serif text-sm font-light text-ink-soft">
-                  Contacta directamente con la pareja para recibir asistencia.
-                </p>
-              </div>
+              <p className="font-serif text-sm font-light text-ink-soft">
+                Contacta directamente con la pareja para recibir asistencia.
+              </p>
             </div>
           </div>
         </div>
-      )
-    }
+      </div>
+    )
+  }
 
+  // Loading Phase
+  if (phase === 'validating') {
     return (
       <div className="flex min-h-screen flex-col items-center justify-center bg-ivory p-6">
         <div className="max-w-md text-center">
