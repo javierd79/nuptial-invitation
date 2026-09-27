@@ -970,7 +970,7 @@ export default function AdminDashboard() {
                   </ul>
                 )}
 
-                <section aria-label="Restaurar lista" className="mt-10 border-t border-ink/10 pt-6">
+                {/* <section aria-label="Restaurar lista" className="mt-10 border-t border-ink/10 pt-6">
                   <p className={labelClasses}>Restaurar lista desde archivo</p>
                   <p className="mt-1 font-serif text-xs italic text-ink-soft">
                     Reemplaza todos los invitados actuales por el contenido de un
@@ -1004,7 +1004,7 @@ export default function AdminDashboard() {
                       {importMessage.text}
                     </p>
                   )}
-                </section>
+                </section> */}
                 </motion.div>
           </>
         )}
