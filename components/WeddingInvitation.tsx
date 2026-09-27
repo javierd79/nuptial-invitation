@@ -829,12 +829,12 @@ export default function WeddingInvitation({ guest }: WeddingInvitationProps) {
                     ? 'Querida'
                     : guestData.gender === 'male'
                       ? 'Querido'
-                      : 'Querido/a'}
+                      : 'Queridos'}
                 </h2>
                 <span className="font-serif text-2xl text-ink md:text-3xl font-medium">{guestData.full_name}</span>
                 <p className="mt-6 max-w-md font-serif text-lg font-light leading-relaxed text-ink-soft">
-                  Es un honor para nosotros que formes parte de un día tan especial. Queremos
-                  compartir contigo la alegría de unir nuestras vidas para siempre.
+                  Es un honor para nosotros que formen parte de un día tan especial. Queremos
+                  compartir con ustedes la alegría de unir nuestras vidas para siempre.
                 </p>
               </Section>
 
